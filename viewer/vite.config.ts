@@ -99,5 +99,4 @@ export default defineConfig({
       },
     },
   },
-  logLevel: 'warn',
 });
