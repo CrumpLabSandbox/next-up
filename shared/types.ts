@@ -123,6 +123,8 @@ export interface NarratorEvent {
 export interface BuilderEvent {
   turn: number;
   type: 'builder';
+  /** 'build' realizes the Narrator's facts; 'polish' applies the Designer's suggestions. Absent = build. */
+  stage?: 'build' | 'polish';
   notes: string;
   ops: Op[];
   rejected: { op: unknown; error: string }[];
@@ -133,9 +135,26 @@ export interface BuilderEvent {
 export interface RenderEvent {
   turn: number;
   type: 'render';
+  /** False for the intermediate render before a polish pass. Absent = final. */
+  final?: boolean;
   shot: string | null;
   triangles: number;
   errors: string[];
+  ts: string;
+}
+
+export interface DesignSuggestion {
+  target: string; // entity id, component name, 'environment' or 'new decor'
+  change: string;
+}
+
+export interface DesignerEvent {
+  turn: number;
+  type: 'designer';
+  critique: string;
+  suggestions: DesignSuggestion[];
+  styleGuide: string;
+  overview: string | null; // overview screenshot the Designer looked at
   ts: string;
 }
 
@@ -146,7 +165,7 @@ export interface SystemEvent {
   ts: string;
 }
 
-export type TimelineEvent = PlayerEvent | NarratorEvent | BuilderEvent | RenderEvent | SystemEvent;
+export type TimelineEvent = PlayerEvent | NarratorEvent | BuilderEvent | RenderEvent | DesignerEvent | SystemEvent;
 
 export interface RunInfo {
   id: string;
@@ -154,6 +173,8 @@ export interface RunInfo {
   premise: string;
   model: string;
   maxTurns: number;
+  /** Designer + polish pass every N turns (0 = no designer). Absent = 0. */
+  designEvery?: number;
   status: 'running' | 'complete' | 'failed' | 'stopped';
   turnsCompleted: number;
   calls: number;

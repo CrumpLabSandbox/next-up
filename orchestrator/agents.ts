@@ -1,11 +1,11 @@
 // The three agents: what each one is shown and what it must return.
 import { readFileSync } from 'node:fs';
 import { callClaude, type Content } from './claude';
-import type { BuilderEvent, FactChange, NarratorEvent, PlayerEvent, TimelineEvent, WorldState } from '../shared/types';
+import type { BuilderEvent, DesignerEvent, DesignSuggestion, FactChange, NarratorEvent, PlayerEvent, TimelineEvent, WorldState } from '../shared/types';
 import { LIMITS } from '../shared/world';
 
 const prompt = (name: string) => readFileSync(new URL(`./prompts/${name}.md`, import.meta.url), 'utf8');
-const PROMPTS = { player: prompt('player'), narrator: prompt('narrator'), builder: prompt('builder') };
+const PROMPTS = { player: prompt('player'), narrator: prompt('narrator'), builder: prompt('builder'), designer: prompt('designer') };
 
 const imageContent = (file: string | null): Content[] =>
   file ? [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: readFileSync(file).toString('base64') } }] : [];
@@ -61,6 +61,25 @@ const BUILDER_SCHEMA = {
     },
   },
   required: ['notes', 'ops'],
+  additionalProperties: false,
+};
+
+const DESIGNER_SCHEMA = {
+  type: 'object',
+  properties: {
+    critique: { type: 'string' },
+    suggestions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { target: { type: 'string' }, change: { type: 'string' } },
+        required: ['target', 'change'],
+        additionalProperties: false,
+      },
+    },
+    styleGuide: { type: 'string' },
+  },
+  required: ['critique', 'suggestions', 'styleGuide'],
   additionalProperties: false,
 };
 
@@ -120,12 +139,13 @@ export async function runPlayer(model: string, turn: number, events: TimelineEve
 }
 
 export async function runNarrator(model: string, turn: number, events: TimelineEvent[], state: WorldState, shot: string | null, premise: string) {
-  const lastBuild = [...events].reverse().find((e): e is BuilderEvent => e.type === 'builder');
+  const lastBuildTurn = [...events].reverse().find((e): e is BuilderEvent => e.type === 'builder')?.turn;
+  const lastBuilds = events.filter((e): e is BuilderEvent => e.type === 'builder' && e.turn === lastBuildTurn);
   const action = [...events].reverse().find((e): e is PlayerEvent => e.type === 'player' && e.turn === turn);
   const parts = [
     `## Established facts\n${factsList(state)}`,
     `## Wanderer position\nat ${fmtVec(state.avatar.at)}, facing ${r1(state.avatar.facing)}° (0 = north)`,
-    lastBuild ? `## Builder's notes from last turn\n${lastBuild.notes}` : '',
+    lastBuilds.length ? `## Builder's notes from last turn\n${lastBuilds.map((b) => b.notes).join('\n')}` : '',
     `## Story so far\n${story(events, 14) || '(nothing yet)'}`,
   ];
   if (turn === 0) {
@@ -143,14 +163,29 @@ export async function runNarrator(model: string, turn: number, events: TimelineE
   return { turn, type: 'narrator', narration: output.narration, movement: output.movement ?? '', facts: output.facts ?? [], ts: new Date().toISOString() } satisfies NarratorEvent;
 }
 
+/** What the Builder is asked to do this call: realize the story, or polish per the Designer. */
+export type BuilderBrief =
+  | { stage: 'build'; narr: NarratorEvent }
+  | { stage: 'polish'; design: DesignerEvent };
+
 export async function runBuilder(
-  model: string, turn: number, narr: NarratorEvent, state: WorldState, shot: string | null,
-  lastTriangles: number, issues: string[], feedback: string | null,
+  model: string, turn: number, brief: BuilderBrief, state: WorldState, shot: string | null,
+  lastTriangles: number, issues: string[], feedback: string | null, styleGuide: string,
 ) {
+  const task = brief.stage === 'build'
+    ? [
+        `## Turn ${turn} narration\n${brief.narr.narration}`,
+        `## Fact changes this turn\n${brief.narr.facts.length ? brief.narr.facts.map((f) => `- ${f.op} ${f.id}: ${f.description} | placement: ${f.placement}`).join('\n') : '(none)'}`,
+        `## Wanderer movement this turn\n${brief.narr.movement || '(none: the Wanderer stays put)'}`,
+      ]
+    : [
+        `## Turn ${turn}: POLISH PASS\nThe Graphic Designer reviewed the scene and asks for these changes. Implement them now (no story changes, no Wanderer movement).`,
+        `Designer's critique: ${brief.design.critique}`,
+        `## Suggestions\n${formatSuggestions(brief.design.suggestions)}`,
+      ];
   const parts = [
-    `## Turn ${turn} narration\n${narr.narration}`,
-    `## Fact changes this turn\n${narr.facts.length ? narr.facts.map((f) => `- ${f.op} ${f.id}: ${f.description} | placement: ${f.placement}`).join('\n') : '(none)'}`,
-    `## Wanderer movement this turn\n${narr.movement || '(none: the Wanderer stays put)'}`,
+    ...task,
+    styleGuide ? `## Style guide (from the Graphic Designer)\n${styleGuide}` : '',
     `## All established facts\n${factsList(state)}`,
     `## Current scene (before your ops)\n${sceneSummary(state, lastTriangles)}`,
     issues.length ? `## Issues from the last render (please fix)\n${issues.map((i) => `- ${i}`).join('\n')}` : '',
@@ -158,8 +193,36 @@ export async function runBuilder(
     feedback ? `## Your previous attempt this turn had problems\n${feedback}\nSend the complete corrected list of ops for this turn (it replaces the previous attempt entirely).` : '',
   ];
   const { output } = await callClaude<{ notes: string; ops: unknown[] }>({
-    label: 'builder', model, system: PROMPTS.builder, schema: BUILDER_SCHEMA,
+    label: `builder:${brief.stage}`, model, system: PROMPTS.builder, schema: BUILDER_SCHEMA,
     content: [...imageContent(shot), { type: 'text', text: parts.filter(Boolean).join('\n\n') }],
   });
   return { notes: output.notes ?? '', ops: Array.isArray(output.ops) ? output.ops : [] };
+}
+
+const formatSuggestions = (list: DesignSuggestion[]) => list.map((x, i) => `${i + 1}. [${x.target}] ${x.change}`).join('\n');
+
+export async function runDesigner(
+  model: string, turn: number, events: TimelineEvent[], state: WorldState,
+  storyShot: string | null, overviewShot: string | null, lastTriangles: number, styleGuide: string,
+): Promise<Omit<DesignerEvent, 'overview'>> {
+  const past = events.filter((e): e is DesignerEvent => e.type === 'designer').slice(-4);
+  const polishes = new Map(events.filter((e): e is BuilderEvent => e.type === 'builder' && e.stage === 'polish').map((b) => [b.turn, b.notes]));
+  const history = past.map((d) => `[Turn ${d.turn}] ${d.critique}\n${formatSuggestions(d.suggestions)}\nBuilder did: ${polishes.get(d.turn) ?? '(n/a)'}`).join('\n\n');
+  const latest = [...events].reverse().find((e): e is NarratorEvent => e.type === 'narrator');
+  const parts = [
+    `Turn ${turn}. Picture 1 is the story view; picture 2 is the overview of the whole scene.`,
+    `## Current style guide\n${styleGuide || '(none yet: establish one)'}`,
+    `## Latest narration\n${latest?.narration ?? ''}`,
+    `## Established story facts (respect these)\n${factsList(state)}`,
+    `## Current scene\n${sceneSummary(state, lastTriangles)}`,
+    history ? `## Your recent critiques and what the Builder did\n${history}` : '',
+  ];
+  const { output } = await callClaude<{ critique: string; suggestions: DesignSuggestion[]; styleGuide: string }>({
+    label: 'designer', model, system: PROMPTS.designer, schema: DESIGNER_SCHEMA,
+    content: [...imageContent(storyShot), ...imageContent(overviewShot), { type: 'text', text: parts.filter(Boolean).join('\n\n') }],
+  });
+  return {
+    turn, type: 'designer', critique: output.critique,
+    suggestions: (output.suggestions ?? []).slice(0, 4), styleGuide: output.styleGuide || styleGuide, ts: new Date().toISOString(),
+  };
 }

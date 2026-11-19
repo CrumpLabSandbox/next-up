@@ -25,6 +25,7 @@ interface Live {
   mod: ComponentModule | null;
   ctx: Ctx;
   born: number; // clock time; NaN when not animating in
+  refreshed: number; // clock time of a visual rebuild (e.g. a polish pass); NaN otherwise
   dying: number; // clock time; NaN when alive
   baseLights: { light: THREE.Light; intensity: number }[];
   updateBroken: boolean;
@@ -176,6 +177,7 @@ export class WorldView {
         disposeTree(existing.root);
       }
       built.born = animate && !existing ? this.time : NaN;
+      built.refreshed = animate && existing ? this.time : NaN;
       this.placeRoot(built, false);
       if (!Number.isNaN(built.born)) built.root.scale.setScalar(0.001);
       this.live.set(e.id, built);
@@ -211,7 +213,7 @@ export class WorldView {
     mid.add(inner);
     const baseLights: Live['baseLights'] = [];
     inner.traverse((o) => { if ((o as THREE.Light).isLight) baseLights.push({ light: o as THREE.Light, intensity: (o as THREE.Light).intensity }); });
-    return { entity: e, sig, root, mid, inner, mod, ctx, born: NaN, dying: NaN, baseLights, updateBroken: false };
+    return { entity: e, sig, root, mid, inner, mod, ctx, born: NaN, refreshed: NaN, dying: NaN, baseLights, updateBroken: false };
   }
 
   private placeRoot(l: Live, animate: boolean) {
@@ -265,15 +267,28 @@ export class WorldView {
     return { desired, look };
   }
 
+  /** High wide shot framing every entity and the wanderer (for the Designer). */
+  private placeCameraOverview() {
+    const pts = [...this.live.values()].map((l) => l.root.position.clone());
+    pts.push(this.avatar.position.clone());
+    const center = pts.reduce((a, p) => a.add(p), new THREE.Vector3()).divideScalar(pts.length);
+    const radius = THREE.MathUtils.clamp(Math.max(...pts.map((p) => p.distanceTo(center))), 12, 90);
+    const yaw = this.avatar.yaw;
+    const back = new THREE.Vector3(Math.sin(yaw + 0.6), 0, Math.cos(yaw + 0.6));
+    this.camera.position.copy(center).addScaledVector(back, radius * 1.5).add(new THREE.Vector3(0, radius * 1.1 + 8, 0));
+    this.lookAt.copy(center);
+  }
+
   /** For headless capture: settle everything at its final pose and render once. */
-  renderStill(t = 2) {
+  renderStill(view: 'story' | 'overview' = 'story', t = 2) {
     this.avatar.snap();
     for (const l of this.live.values()) {
       l.born = NaN;
       if (l.root.userData.moveTo) { l.root.position.copy(l.root.userData.moveTo); delete l.root.userData.moveTo; }
     }
     this.time = t;
-    this.placeCameraBehind(true);
+    if (view === 'overview') this.placeCameraOverview();
+    else this.placeCameraBehind(true);
     this.camera.lookAt(this.lookAt);
     for (let i = 0; i < 40; i++) this.atmo.update(0.1, this.avatar.position, this.glowOpacity());
     this.updateEntities(0.016);
@@ -374,6 +389,11 @@ export class WorldView {
         const x = Math.min(1, (t - l.born) / SPAWN_SECS);
         l.root.scale.setScalar(e.scale * Math.max(0.001, easeOutBack(x)));
         if (x >= 1) { l.born = NaN; l.root.scale.setScalar(e.scale); }
+      } else if (!Number.isNaN(l.refreshed)) {
+        // A quick breath so viewers can see what a polish pass changed.
+        const x = Math.min(1, (t - l.refreshed) / 0.9);
+        l.root.scale.setScalar(e.scale * (1 + Math.sin(x * Math.PI) * 0.08));
+        if (x >= 1) { l.refreshed = NaN; l.root.scale.setScalar(e.scale); }
       }
       const mv = l.root.userData;
       if (mv.moveTo) {

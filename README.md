@@ -4,15 +4,16 @@ An emergent 3D world that doesn't exist until someone looks at it.
 
 **Watch the replays:** https://crumplabsandbox.github.io/next-up/
 
-Three Claude agents take turns:
+Four Claude agents take turns:
 
 | Agent | Sees | Does |
 |---|---|---|
 | **Wanderer** (player) | the Narrator's words + a screenshot of the real 3D view | takes one text-adventure action |
 | **Narrator** (world-keeper) | the action, all established facts, the view | narrates and records new or changed **facts** (stable ids, descriptions, placements) |
 | **Builder** | the new facts, the current scene and its code, the view | emits **ops**: defines procedural three.js components and places, updates and removes entities, changes sky and light, moves the wanderer |
+| **Graphic Designer** | the story view + a high overview shot, the scene and its code | critiques the look, gives 2–4 concrete suggestions and keeps a running **style guide**. The Builder then does a **polish pass** to make the changes, and follows the style guide in later builds |
 
-Every step is appended to `runs/<id>/timeline.jsonl`. The world at any point is just the replay of that log, so the viewer can play the whole thing back, scrub and watch things materialize.
+A turn is: Wanderer → Narrator → Builder → render → Designer → Builder (polish) → render. Both renders are kept, so you can see what each polish changed. Every step is appended to `runs/<id>/timeline.jsonl`. The world at any point is just the replay of that log, so the viewer can play the whole thing back, scrub and watch things materialize.
 
 ## Use
 
@@ -21,6 +22,7 @@ npm install
 npx playwright install chromium-headless-shell   # once, for screenshots
 
 npm run world -- --turns 50                  # new run (uses your Claude subscription via `claude -p`)
+npm run world -- --turns 50 --design-every 0 # no Designer (or 3 = a design pass every 3rd turn)
 npm run world -- --turns 50 --premise "..."  # optional seed for the world
 npm run world -- --resume <run-id>           # continue after a crash or stop
 touch runs/<run-id>/STOP                     # stop cleanly after the current turn
@@ -38,7 +40,7 @@ Viewer: play/pause (space), step (← →), scrub, speed. Camera modes: **Follow
 shared/        world model shared by both sides: types, reducer (facts + ops → WorldState), component API
 orchestrator/  turn loop (run.ts), agents + prompts, Node component checker, headless capture
 viewer/        Vite + three.js: runtime (scene diffing, avatar, atmosphere), UI (feed, timeline)
-runs/<id>/     run.json, timeline.jsonl, shots/turn-NNN.jpg, components/*.js (readable copies)
+runs/<id>/     run.json, timeline.jsonl, shots/turn-NNN{-build,-overview,}.jpg, components/*.js (readable copies)
 ```
 
 ## Guardrails

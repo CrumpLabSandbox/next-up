@@ -12,9 +12,9 @@ if (params.has('capture')) {
   document.body.classList.add('capture');
   const view = new WorldView(canvas);
   (window as unknown as Record<string, unknown>).__nextup = {
-    async render(state: WorldState) {
+    async render(state: WorldState, which: 'story' | 'overview' = 'story') {
       await view.setState(state, false);
-      view.renderStill();
+      view.renderStill(which);
       return { errors: view.drainErrors(), triangles: view.triangleCount() };
     },
   };
@@ -131,6 +131,7 @@ function startViewer() {
     const base = ev.type === 'player' ? 1800 + ev.action.length * 15
       : ev.type === 'narrator' ? Math.min(7000, 1500 + ev.narration.length * 18)
       : ev.type === 'builder' ? 3000
+      : ev.type === 'designer' ? Math.min(8000, 2500 + ev.critique.length * 15)
       : 1000;
     return base / speed();
   }

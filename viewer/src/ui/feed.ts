@@ -41,13 +41,18 @@ export function renderEvent(ev: TimelineEvent, runId: string): HTMLElement | nul
     case 'narrator':
       return el(`<div class="msg narrator"><div class="who">Narrator</div><div class="narration">${esc(ev.narration)}</div>${ev.movement ? `<div class="move">↳ ${esc(ev.movement)}</div>` : ''}<div class="chips">${factChips(ev)}</div></div>`);
     case 'builder':
-      return el(`<div class="msg builder"><div class="who">Builder${ev.attempts > 1 ? ` · ${ev.attempts} tries` : ''}</div>${builderBody(ev)}</div>`);
-    case 'render':
+      return el(`<div class="msg builder${ev.stage === 'polish' ? ' polish' : ''}"><div class="who">Builder${ev.stage === 'polish' ? ' · polish' : ''}${ev.attempts > 1 ? ` · ${ev.attempts} tries` : ''}</div>${builderBody(ev)}</div>`);
+    case 'designer':
+      return el(`<div class="msg designer"><div class="who">Graphic Designer</div><div>${esc(ev.critique)}</div><ol class="suggest">${ev.suggestions.map((x) => `<li><code>${esc(x.target)}</code> ${esc(x.change)}</li>`).join('')}</ol>${ev.overview ? `<img class="shot" loading="lazy" src="runs/${esc(runId)}/${esc(ev.overview)}" alt="Overview the designer reviewed">` : ''}<details><summary>style guide</summary><div class="guide">${esc(ev.styleGuide)}</div></details></div>`);
+    case 'render': {
       if (!ev.shot && !ev.errors.length) return null;
-      return el(`<div class="msg system">${ev.shot ? `<img class="shot" loading="lazy" src="runs/${esc(runId)}/${esc(ev.shot)}" alt="What the wanderer sees after turn ${ev.turn}">` : ''}${ev.errors.map((e) => `<div>⚠ ${esc(e)}</div>`).join('')}<div>${ev.triangles.toLocaleString()} triangles</div></div>`);
+      const label = ev.final === false ? 'after build' : 'view';
+      return el(`<div class="msg system">${ev.shot ? `<img class="shot" loading="lazy" src="runs/${esc(runId)}/${esc(ev.shot)}" alt="What the wanderer sees after turn ${ev.turn}">` : ''}${ev.errors.map((e) => `<div>⚠ ${esc(e)}</div>`).join('')}<div>${label} · ${ev.triangles.toLocaleString()} triangles</div></div>`);
+    }
     case 'system':
       return el(`<div class="msg system">${esc(ev.message)}</div>`);
   }
+  return null;
 }
 
 export class Feed {

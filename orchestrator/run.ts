@@ -1,18 +1,18 @@
 // The turn loop: Wanderer acts → Narrator establishes facts → Builder builds →
-// render a screenshot. Every step is appended to runs/<id>/timeline.jsonl.
+// render → (Designer critiques → Builder polishes → render). Every step is appended to runs/<id>/timeline.jsonl.
 //
-//   npm run world -- --turns 50 [--premise "..."] [--model sonnet] [--id name]
+//   npm run world -- --turns 50 [--premise "..."] [--model sonnet] [--id name] [--design-every 1]
 //   npm run world -- --resume <id> [--turns 50]
 //   touch runs/<id>/STOP   (stops cleanly after the current turn)
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { runBuilder, runNarrator, runPlayer } from './agents';
+import { runBuilder, runDesigner, runNarrator, runPlayer, type BuilderBrief } from './agents';
 import { Capture } from './capture';
 import { checkWorld } from './check';
 import { applyEvent, applyOp, cloneWorld, emptyWorld, LIMITS, worldFromEvents } from '../shared/world';
-import type { BuilderEvent, NarratorEvent, Op, RenderEvent, RunInfo, TimelineEvent, WorldState } from '../shared/types';
+import type { BuilderEvent, DesignerEvent, Op, RenderEvent, RunInfo, TimelineEvent, WorldState } from '../shared/types';
 
 const RUNS = fileURLToPath(new URL('../runs/', import.meta.url));
 
@@ -23,6 +23,7 @@ const { values: args } = parseArgs({
     model: { type: 'string', default: 'sonnet' },
     id: { type: 'string' },
     resume: { type: 'string' },
+    'design-every': { type: 'string', default: '1' },
   },
 });
 
@@ -51,7 +52,7 @@ if (args.resume) {
   const all: TimelineEvent[] = existsSync(join(dir, 'timeline.jsonl'))
     ? readFileSync(join(dir, 'timeline.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
     : [];
-  const done = all.filter((e) => e.type === 'render').map((e) => e.turn);
+  const done = all.filter((e) => e.type === 'render' && e.final !== false).map((e) => e.turn);
   const lastDone = done.length ? Math.max(...done) : -1;
   events = all.filter((e) => e.turn <= lastDone);
   writeFileSync(join(dir, 'timeline.jsonl'), events.map((e) => JSON.stringify(e) + '\n').join(''));
@@ -65,7 +66,7 @@ if (args.resume) {
   if (existsSync(dir)) throw new Error(`${dir} already exists`);
   run = {
     id, created: now(), premise: args.premise ?? '', model: args.model!, maxTurns: Number(args.turns),
-    status: 'running', turnsCompleted: 0, calls: 0,
+    designEvery: Number(args['design-every']), status: 'running', turnsCompleted: 0, calls: 0,
   };
 }
 mkdirSync(join(dir, 'shots'), { recursive: true });
@@ -79,10 +80,14 @@ let state: WorldState = worldFromEvents(events);
 let lastShot: string | null = null;
 let lastTriangles = 0;
 let issues: string[] = [];
+let styleGuide = '';
 {
   const r = [...events].reverse().find((e): e is RenderEvent => e.type === 'render');
   if (r) { lastShot = r.shot ? join(dir, r.shot) : null; lastTriangles = r.triangles; issues = r.errors; }
+  const d = [...events].reverse().find((e): e is DesignerEvent => e.type === 'designer');
+  if (d) styleGuide = d.styleGuide;
 }
+const designEvery = run.designEvery ?? 0;
 
 function record(ev: TimelineEvent) {
   events.push(ev);
@@ -110,13 +115,13 @@ async function trial(ops: unknown[], turn: number) {
   return { accepted, rejected, problems: check.problems };
 }
 
-async function build(turn: number, narr: NarratorEvent): Promise<BuilderEvent> {
+async function build(turn: number, brief: BuilderBrief): Promise<BuilderEvent> {
   let feedback: string | null = null;
   let out = { notes: '', ops: [] as unknown[] };
   let t: Awaited<ReturnType<typeof trial>> | null = null;
   let attempts = 0;
   for (attempts = 1; attempts <= 2; attempts++) {
-    out = await runBuilder(run.model, turn, narr, state, lastShot, lastTriangles, issues, feedback);
+    out = await runBuilder(run.model, turn, brief, state, lastShot, lastTriangles, issues, feedback, styleGuide);
     run.calls++;
     t = await trial(out.ops, turn);
     if (!t.rejected.length && !t.problems.length) break;
@@ -147,7 +152,7 @@ async function build(turn: number, narr: NarratorEvent): Promise<BuilderEvent> {
     }
     ops.push(op);
   }
-  return { turn, type: 'builder', notes: out.notes, ops, rejected, attempts: Math.min(attempts, 2), ts: now() };
+  return { turn, type: 'builder', stage: brief.stage, notes: out.notes, ops, rejected, attempts: Math.min(attempts, 2), ts: now() };
 }
 
 function saveComponents(ev: BuilderEvent) {
@@ -168,10 +173,10 @@ process.on('SIGINT', () => {
 const capture = new Capture();
 await capture.start();
 
-async function render(turn: number) {
-  const shot = `shots/turn-${pad(turn)}.jpg`;
-  const res = await capture.render(state, join(dir, shot));
-  const ev: RenderEvent = { turn, type: 'render', shot, triangles: res.triangles, errors: res.errors.slice(0, 10), ts: now() };
+async function render(turn: number, final: boolean) {
+  const shot = `shots/turn-${pad(turn)}${final ? '' : '-build'}.jpg`;
+  const res = await capture.render(state, join(dir, shot), 'story');
+  const ev: RenderEvent = { turn, type: 'render', final, shot, triangles: res.triangles, errors: res.errors.slice(0, 10), ts: now() };
   if (res.triangles > LIMITS.trianglesTotal) ev.errors.push(`scene has ${res.triangles} triangles, over the ${LIMITS.trianglesTotal} budget: simplify or instance something`);
   record(ev);
   lastShot = join(dir, shot);
@@ -181,6 +186,8 @@ async function render(turn: number) {
 
 try {
   const startTurn = events.some((e) => e.type === 'render') ? run.turnsCompleted + 1 : 0;
+  const logBuild = (b: BuilderEvent) =>
+    console.log(`  builder${b.stage === 'polish' ? ' (polish)' : ''}: ${b.notes}\n  ops: ${b.ops.map((o) => `${o.op}${'id' in o ? ` ${o.id}` : 'name' in o ? ` ${o.name}` : ''}`).join(', ')}${b.rejected.length ? ` | rejected ${b.rejected.length}` : ''}`);
   for (let turn = startTurn; turn <= run.maxTurns; turn++) {
     const t0 = Date.now();
     console.log(`\n=== ${turn === 0 ? 'Genesis' : `Turn ${turn}`} ===`);
@@ -195,12 +202,30 @@ try {
     record(n);
     console.log(`  narrator: ${n.narration}\n  facts: ${n.facts.map((f) => `${f.op} ${f.id}`).join(', ') || '-'}`);
 
-    const b = await build(turn, n);
+    const b = await build(turn, { stage: 'build', narr: n });
     record(b);
     saveComponents(b);
-    console.log(`  builder: ${b.notes}\n  ops: ${b.ops.map((o) => `${o.op}${'id' in o ? ` ${o.id}` : 'name' in o ? ` ${o.name}` : ''}`).join(', ')}${b.rejected.length ? ` | rejected ${b.rejected.length}` : ''}`);
+    logBuild(b);
 
-    await render(turn);
+    const designTurn = designEvery > 0 && turn % designEvery === 0;
+    await render(turn, !designTurn);
+
+    if (designTurn) {
+      const overview = `shots/turn-${pad(turn)}-overview.jpg`;
+      await capture.render(state, join(dir, overview), 'overview');
+      const d = await runDesigner(run.model, turn, events, state, lastShot, join(dir, overview), lastTriangles, styleGuide);
+      run.calls++;
+      const dev: DesignerEvent = { ...d, overview };
+      record(dev);
+      styleGuide = dev.styleGuide;
+      console.log(`  designer: ${dev.critique}\n${dev.suggestions.map((x) => `    - [${x.target}] ${x.change}`).join('\n')}`);
+
+      const pb = await build(turn, { stage: 'polish', design: dev });
+      record(pb);
+      saveComponents(pb);
+      logBuild(pb);
+      await render(turn, true);
+    }
     console.log(`  render: ${lastTriangles} tris${issues.length ? ` | ${issues.length} issues` : ''} · ${Math.round((Date.now() - t0) / 1000)}s`);
 
     run.turnsCompleted = turn;

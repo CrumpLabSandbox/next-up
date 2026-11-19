@@ -1,0 +1,11 @@
+{
+  "id": "test-design",
+  "created": "2026-11-19T15:52:03.388Z",
+  "premise": "",
+  "model": "sonnet",
+  "maxTurns": 2,
+  "designEvery": 1,
+  "status": "complete",
+  "turnsCompleted": 2,
+  "calls": 15
+}

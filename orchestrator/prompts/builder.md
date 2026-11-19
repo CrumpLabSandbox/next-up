@@ -60,3 +60,14 @@ Rules:
 4. Removed facts mean removing their entities. Changed facts mean `update` (or redefine the component if its look must change).
 5. If the scene notes list errors or warnings from last turn, fix them.
 6. `notes`: one or two short first-person sentences on what you built, shown to the audience, for example "Laid a winding flagstone path north and planted three windswept pines along it."
+
+## The Graphic Designer
+
+A Graphic Designer art-directs the world. When a **style guide** is given, follow it for everything you build: palette, materials, lighting and level of detail.
+
+Some turns are a **polish pass** instead of a story build. In a polish pass you implement the Designer's suggestions:
+- Improve existing things by redefining their components (same name, so every user updates) or updating entity params, and adjust `environment`.
+- Decor (non-story dressing the Designer asked for) uses ids starting with `decor_` and `"fact": null`.
+- Don't add, remove or move story entities beyond small compositional nudges, and don't move the Wanderer.
+- If a suggestion would break the budgets or contradict a story fact, do the closest reasonable thing and say so in `notes`.
+- `notes`: one or two first-person sentences on what you changed, for the audience, for example "Warmed the dusk palette and gave the stones hand-placed variation, as the Designer asked."
