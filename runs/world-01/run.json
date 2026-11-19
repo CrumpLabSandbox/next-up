@@ -4,7 +4,7 @@
   "premise": "",
   "model": "sonnet",
   "maxTurns": 50,
-  "status": "running",
-  "turnsCompleted": 31,
-  "calls": 95
+  "status": "complete",
+  "turnsCompleted": 50,
+  "calls": 152
 }
