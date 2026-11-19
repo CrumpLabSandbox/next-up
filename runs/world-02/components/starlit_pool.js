@@ -1,4 +1,4 @@
-// Cavern under the ice opening: dim floor, low south edge, soft side walls, star-mirroring pool, endless feathered water to the south with round sparkle discs thinning with distance and a silver sheen toward the pillar, ripples, amber mist; origin at pool center on floor level; params: radius
+// Cavern under the ice opening: dim floor, walls, star-mirroring pool, lifted feathered water to the south with sparkle discs and silver sheen, ripples, amber mist; origin at pool center on floor level; params: radius
 export function build(THREE, p, ctx) {
   const g = new THREE.Group();
   const R = p.radius || 6;
@@ -45,16 +45,14 @@ export function build(THREE, p, ctx) {
   });
   const wg = new THREE.CircleGeometry(40, 40);
   wg.rotateX(-Math.PI / 2);
-  const water = new THREE.Mesh(wg, new THREE.MeshBasicMaterial({ color: '#1f2b52', alphaMap: feather, transparent: true, depthWrite: false, fog: true }));
+  const water = new THREE.Mesh(wg, new THREE.MeshBasicMaterial({ color: '#26346a', alphaMap: feather, transparent: true, depthWrite: false, fog: true }));
   water.position.set(0, 0.04, 15);
   g.add(water);
-  // silver sheen brightening toward the pillar (south)
   const sg = new THREE.PlaneGeometry(36, 34);
   sg.rotateX(-Math.PI / 2);
-  const sheen = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ color: '#4a5a8a', alphaMap: feather, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  const sheen = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ color: '#4a5a8a', alphaMap: feather, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   sheen.position.set(0, 0.06, 24);
   g.add(sheen);
-  // round sparkle discs, thinning beyond 20 m
   const sn2 = 170;
   const stars = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 0.01, 6), new THREE.MeshBasicMaterial({ color: '#cfd8f5', fog: true }), sn2);
   const dd = new THREE.Object3D();

@@ -1,4 +1,4 @@
-// Slender leafless luminous silver tree with curling branches, a parting bud showing a line of white light, pulsing bark glow, drifting gold motes; params: height, color, open (0-1 bud opening)
+// Slender leafless luminous silver tree with curling branches, parting bud with line of white light, pulsing bark glow, round drifting gold motes; params: height, color, open
 export function build(THREE, p, ctx) {
   const g = new THREE.Group();
   const H = p.height || 4;
@@ -52,7 +52,7 @@ export function build(THREE, p, ctx) {
   bud.position.set(tip[2] * Math.sin(tip[3]), tip[1], tip[2] * Math.cos(tip[3]));
   g.add(bud);
   const mn = 12;
-  const mo = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.03, 0), new THREE.MeshBasicMaterial({ color: '#ffd37a', fog: false }), mn);
+  const mo = new THREE.InstancedMesh(new THREE.SphereGeometry(0.035, 6, 4), new THREE.MeshBasicMaterial({ color: '#ffd37a', transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }), mn);
   const seeds = [];
   for (let i = 0; i < mn; i++) seeds.push([ctx.range(0, 6.28), ctx.range(0.4, 1.6), ctx.rng(), ctx.range(0.03, 0.08), ctx.range(0, 6)]);
   g.add(mo);
@@ -73,7 +73,7 @@ export function update(obj, t) {
     const a = q[0] + t * 0.3;
     u.d.position.set(Math.cos(a) * q[1], u.H * (0.5 + 0.6 * f), Math.sin(a) * q[1]);
     u.d.scale.setScalar(Math.max(0.05, Math.sin(Math.PI * f)) * (0.7 + 0.3 * Math.sin(t * 3 + q[4])));
-    u.d.rotation.set(t + q[4], t * 0.5, 0);
+    u.d.rotation.set(0, 0, 0);
     u.d.updateMatrix();
     u.mo.setMatrixAt(i, u.d.matrix);
   }
