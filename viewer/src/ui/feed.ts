@@ -1,5 +1,6 @@
 // The chat feed: one block per turn showing what each agent said and did.
 import type { BuilderEvent, NarratorEvent, Op, TimelineEvent } from '../../../shared/types';
+import { fmtBytes } from '../../../shared/ladder';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -18,6 +19,9 @@ function opChip(op: Op): string {
     case 'environment': return `<span class="chip">☼ environment</span>`;
     case 'moveAvatar': return `<span class="chip">→ wanderer</span>`;
   }
+  // Ladder engines define their own ops.
+  const o = op as { op?: string; id?: string; name?: string };
+  return `<span class="chip">${esc(String(o.op ?? '?'))}${o.id || o.name ? ` ${esc(String(o.id ?? o.name))}` : ''}</span>`;
 }
 
 function factChips(ev: NarratorEvent) {
@@ -43,12 +47,19 @@ export function renderEvent(ev: TimelineEvent, runId: string): HTMLElement | nul
     case 'builder':
       return el(`<div class="msg builder${ev.stage === 'polish' ? ' polish' : ''}"><div class="who">Builder${ev.stage === 'polish' ? ' · polish' : ''}${ev.attempts > 1 ? ` · ${ev.attempts} tries` : ''}</div>${builderBody(ev)}</div>`);
     case 'designer':
-      return el(`<div class="msg designer"><div class="who">Graphic Designer</div><div>${esc(ev.critique)}</div><ol class="suggest">${ev.suggestions.map((x) => `<li><code>${esc(x.target)}</code> ${esc(x.change)}</li>`).join('')}</ol>${ev.overview ? `<img class="shot" loading="lazy" src="runs/${esc(runId)}/${esc(ev.overview)}" alt="Overview the designer reviewed">` : ''}<details><summary>style guide</summary><div class="guide">${esc(ev.styleGuide)}</div></details></div>`);
+      return el(`<div class="msg designer"><div class="who">Graphic Designer</div><div>${esc(ev.critique)}</div>${ev.requestUnlock ? `<div class="ask unlock">▲ asks for more room: ${esc(ev.unlockReason ?? '')}</div>` : ''}${ev.engineRequest ? `<div class="ask engine">⚙ asks for a new engine: ${esc(ev.engineRequest)}</div>` : ''}<ol class="suggest">${ev.suggestions.map((x) => `<li><code>${esc(x.target)}</code> ${esc(x.change)}</li>`).join('')}</ol>${ev.overview ? `<img class="shot" loading="lazy" src="runs/${esc(runId)}/${esc(ev.overview)}" alt="Overview the designer reviewed">` : ''}<details><summary>style guide</summary><div class="guide">${esc(ev.styleGuide)}</div></details></div>`);
     case 'render': {
       if (!ev.shot && !ev.errors.length) return null;
       const label = ev.final === false ? 'after build' : 'view';
-      return el(`<div class="msg system">${ev.shot ? `<img class="shot" loading="lazy" src="runs/${esc(runId)}/${esc(ev.shot)}" alt="What the wanderer sees after turn ${ev.turn}">` : ''}${ev.errors.map((e) => `<div>⚠ ${esc(e)}</div>`).join('')}<div>${label} · ${ev.triangles.toLocaleString()} triangles</div></div>`);
+      const size = ev.bytes !== undefined ? `${fmtBytes(ev.bytes)}` : `${ev.triangles.toLocaleString()} triangles`;
+      return el(`<div class="msg system">${ev.shot ? `<img class="shot" loading="lazy" src="runs/${esc(runId)}/${esc(ev.shot)}" alt="What the wanderer sees after turn ${ev.turn}">` : ''}${ev.errors.map((e) => `<div>⚠ ${esc(e)}</div>`).join('')}<div>${label} · ${size}</div></div>`);
     }
+    case 'budget':
+      return el(`<div class="banner budget"><b>▲ Budget ${ev.tier === 0 ? 'starts at' : 'unlocked:'} ${fmtBytes(ev.limit)}</b>${esc(ev.reason)}</div>`);
+    case 'engineer':
+      return el(`<div class="msg engineer"><div class="who">Engineer · ${ev.ok ? `built ${esc(ev.version ?? '')}` : 'failed'} · ${ev.minutes} min</div><div class="request">Request: ${esc(ev.request)}</div><div>${esc(ev.notes)}</div>${ev.problems.length ? `<div class="chips">${ev.problems.map((p) => `<span class="chip bad">${esc(p)}</span>`).join('')}</div>` : ''}</div>`);
+    case 'engine':
+      return el(`<div class="banner engine"><b>⚙ Engine ${esc(ev.version)}${ev.from ? ` takes over from ${esc(ev.from)}` : ''} · ${fmtBytes(ev.bytes)}</b>${esc(ev.notes)}</div>`);
     case 'system':
       return el(`<div class="msg system">${esc(ev.message)}</div>`);
   }

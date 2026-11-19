@@ -1,0 +1,5 @@
+{
+  "version": "v2",
+  "notes": "Engine v2 puts the cold slate plain under a blue-above, warm-below ambient light. The ground and stones are now gritty, and the lantern glows with a soft halo. The Wanderer now has a head and a warm rim light, so the figure reads against the dark. The lantern post, standing stone and Wanderer cast soft blob shadows away from the lantern, and up to eight lights flicker.\n\nThe check passes at 7.1 KB of the 16 KB budget (5.6 KB engine, 1.5 KB world), so the Builder has room to add things. The pictures show the post, stone, shadows and halo working. I did not re-look at the Wanderer's brightness after the last small dimming tweak, though the check passed afterward.\n\nOps now reject invalid ids, bad colors and non-numeric vectors. `set` takes a `rot` yaw in degrees, and migration angles the existing stepping stones. All v1 ops are kept, and `OPS.md` is rewritten for the Builder.",
+  "bytes": 5782
+}

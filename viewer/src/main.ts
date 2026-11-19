@@ -1,15 +1,18 @@
-import { WorldView, type CameraMode } from './runtime/world-view';
+import { WorldView } from './runtime/world-view';
 import { Feed } from './ui/feed';
-import { worldFromEvents } from '../../shared/world';
+import { Stage } from './stage';
+import { snapshot, type Snapshot } from './model';
+import { TIERS, fmtBytes } from '../../shared/ladder';
 import type { RunInfo, TimelineEvent, WorldState } from '../../shared/types';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const params = new URLSearchParams(location.search);
-const canvas = $<HTMLCanvasElement>('#c');
 
 if (params.has('capture')) {
-  // Headless mode for the orchestrator: render a state passed in from Playwright.
+  // Legacy headless mode for orchestrator/run.ts: render a state passed in from Playwright.
   document.body.classList.add('capture');
+  const canvas = document.createElement('canvas');
+  $('#stage').prepend(canvas);
   const view = new WorldView(canvas);
   (window as unknown as Record<string, unknown>).__nextup = {
     async render(state: WorldState, which: 'story' | 'overview' = 'story') {
@@ -24,8 +27,7 @@ if (params.has('capture')) {
 }
 
 function startViewer() {
-  const view = new WorldView(canvas);
-  view.start();
+  const stage = new Stage($('#stage'));
   const feed = new Feed($('#feed'));
   const pos = $<HTMLInputElement>('#pos');
   const playBtn = $<HTMLButtonElement>('#play');
@@ -36,7 +38,8 @@ function startViewer() {
   let run: RunInfo | null = null;
   let events: TimelineEvent[] = [];
   let cursor = 0; // number of events revealed
-  let state: WorldState = worldFromEvents([], 0);
+  let snap: Snapshot | null = null;
+  let seekToken = 0;
   let playing = false;
   let timer: number | undefined;
   let pollTimer: number | undefined;
@@ -70,8 +73,9 @@ function startViewer() {
     run = info;
     events = evs;
     $('#premise').textContent = info.premise;
+    $('#ladder').hidden = info.mode !== 'ladder';
     feed.clear();
-    seek(0, false);
+    await seek(0, false);
     updateStatus();
     renderTicks();
     if (info.status === 'running') pollTimer = window.setInterval(poll, 3000);
@@ -102,28 +106,53 @@ function startViewer() {
     const ticks = $('#ticks');
     ticks.innerHTML = '';
     events.forEach((e, i) => {
-      if (i > 0 && events[i - 1].turn === e.turn) return;
-      const t = document.createElement('i');
-      t.style.left = `${(i / Math.max(1, events.length)) * 100}%`;
-      ticks.append(t);
+      const left = `${(i / Math.max(1, events.length)) * 100}%`;
+      if (e.type === 'engine' || e.type === 'budget') {
+        const t = document.createElement('i');
+        t.className = e.type;
+        t.style.left = left;
+        t.title = e.type === 'engine' ? `engine ${e.version}` : `budget ${fmtBytes(e.limit)}`;
+        ticks.append(t);
+      } else if (i === 0 || events[i - 1].turn !== e.turn) {
+        const t = document.createElement('i');
+        t.style.left = left;
+        ticks.append(t);
+      }
     });
+  }
+
+  /** Ladder header: which engine is live and how full the budget is (log scale). */
+  function updateLadder(s: Snapshot) {
+    if (run?.mode !== 'ladder') return;
+    const eng = $('#engine');
+    eng.textContent = `engine ${s.engine ?? '–'}`;
+    eng.title = s.engineNotes;
+    const lo = Math.log(TIERS[0] / 4), hi = Math.log(TIERS[TIERS.length - 1]);
+    const frac = (b: number) => `${Math.max(0, Math.min(1, (Math.log(Math.max(1, b)) - lo) / (hi - lo))) * 100}%`;
+    $('#budget-limit').style.width = frac(s.limit);
+    $('#budget-used').style.width = frac(s.bytes ?? 0);
+    $('#budget-label').textContent = `${fmtBytes(s.bytes ?? 0)} / ${fmtBytes(s.limit)}`;
   }
 
   const turnAt = (c: number) => (c > 0 ? events[c - 1].turn : 0);
 
-  function seek(c: number, animate: boolean) {
+  async function seek(c: number, animate: boolean) {
     c = Math.max(0, Math.min(events.length, c));
     // Render events carry no world change; reveal them with the step before.
     while (c < events.length && c > 0 && events[c].type === 'render') c++;
     cursor = c;
-    state = worldFromEvents(events, cursor);
-    view.setState(state, animate);
     feed.show(events, cursor, run?.id ?? '');
     pos.value = String(cursor);
-    const last = run?.maxTurns ?? 0;
-    $('#turnlabel').textContent = cursor === 0 ? 'start' : `turn ${turnAt(cursor)} / ${last}`;
+    $('#turnlabel').textContent = cursor === 0 ? 'start' : `turn ${turnAt(cursor)} / ${run?.maxTurns ?? 0}`;
     const narr = [...events.slice(0, cursor)].reverse().find((e) => e.type === 'narrator');
     caption.textContent = narr && narr.type === 'narrator' ? narr.narration : '';
+    if (!run) return;
+    const token = ++seekToken;
+    const s = await snapshot(run, events, cursor);
+    if (token !== seekToken) return;
+    snap = s;
+    updateLadder(s);
+    await stage.show(s.engineUrl, s.world, animate);
   }
 
   function delayFor(ev: TimelineEvent | undefined) {
@@ -132,17 +161,20 @@ function startViewer() {
       : ev.type === 'narrator' ? Math.min(7000, 1500 + ev.narration.length * 18)
       : ev.type === 'builder' ? 3000
       : ev.type === 'designer' ? Math.min(8000, 2500 + ev.critique.length * 15)
+      : ev.type === 'engineer' ? 4500
+      : ev.type === 'engine' ? 4000
+      : ev.type === 'budget' ? 2500
       : 1000;
     return base / speed();
   }
 
-  function step() {
+  async function step() {
     if (cursor >= events.length) {
       if (run?.status !== 'running') pause();
       return;
     }
-    seek(cursor + 1, true);
-    timer = window.setTimeout(step, delayFor(events[cursor - 1]));
+    await seek(cursor + 1, true);
+    if (playing) timer = window.setTimeout(step, delayFor(events[cursor - 1]));
   }
 
   function play() {
@@ -159,11 +191,6 @@ function startViewer() {
     playBtn.innerHTML = '&#9654;';
   }
 
-  const toStart = (turn: number) => {
-    pause();
-    const i = events.findIndex((e) => e.turn === turn);
-    seek(i < 0 ? 0 : i, false);
-  };
   feed.onSeekTurn = (t) => {
     pause();
     const i = events.findIndex((e) => e.turn > t);
@@ -178,7 +205,7 @@ function startViewer() {
     while (c > 0 && events[c - 1].type === 'render') c--;
     seek(c - 1, false);
   };
-  $('#first').onclick = () => toStart(0);
+  $('#first').onclick = () => { pause(); seek(0, false); };
   $('#last').onclick = () => { pause(); seek(events.length, false); };
   pos.oninput = () => { pause(); seek(Number(pos.value), false); };
   pos.onmousemove = (e) => {
@@ -192,43 +219,45 @@ function startViewer() {
   };
   pos.onmouseleave = () => (thumb.hidden = true);
 
-  function setMode(m: CameraMode) {
-    view.setMode(m);
-    document.querySelectorAll<HTMLButtonElement>('#modes button').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
+  const modeButtons = () => document.querySelectorAll<HTMLButtonElement>('#modes button');
+  function setMode(m: string) {
+    if (!stage.modes.includes(m)) m = 'follow';
+    stage.setMode(m);
+    modeButtons().forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
     $('#walkhelp').hidden = m !== 'walk';
-    if (m === 'walk') canvas.focus();
   }
-  document.querySelectorAll<HTMLButtonElement>('#modes button').forEach((b) => (b.onclick = () => setMode(b.dataset.mode as CameraMode)));
+  stage.onModes = (modes) => {
+    modeButtons().forEach((b) => (b.disabled = !modes.includes(b.dataset.mode!)));
+    const on = [...modeButtons()].find((b) => b.classList.contains('on'))?.dataset.mode ?? 'follow';
+    if (!modes.includes(on)) setMode('follow');
+  };
+  modeButtons().forEach((b) => (b.onclick = () => setMode(b.dataset.mode!)));
 
+  const handleKey = (key: string) => {
+    if (key === 'Escape') setMode('follow');
+    else if (key === ' ') (playing ? pause() : play());
+    else if (key === 'ArrowRight') $('#fwd').click();
+    else if (key === 'ArrowLeft') $('#back').click();
+    else if (key === 'f') setMode('follow');
+    else if (key === 'o') setMode('orbit');
+    else if (key === 'k') setMode('walk');
+  };
+  stage.onKey = handleKey;
   addEventListener('keydown', (e) => {
     if ((e.target as HTMLElement).tagName === 'SELECT') return;
-    if (e.key === 'Escape') setMode('follow');
-    if (view.getMode() === 'walk') return;
-    if (e.key === ' ') { e.preventDefault(); playing ? pause() : play(); }
-    else if (e.key === 'ArrowRight') $('#fwd').click();
-    else if (e.key === 'ArrowLeft') $('#back').click();
-    else if (e.key === 'f') setMode('follow');
-    else if (e.key === 'o') setMode('orbit');
-    else if (e.key === 'k') setMode('walk');
+    if ([' ', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+    handleKey(e.key);
   });
 
-  let hoverFrame = 0;
-  canvas.addEventListener('pointermove', (e) => {
-    if (hoverFrame) return;
-    hoverFrame = requestAnimationFrame(() => {
-      hoverFrame = 0;
-      const id = view.entityAt(e.clientX, e.clientY);
-      const ent = id ? state.entities[id] : null;
-      if (!ent) { tip.hidden = true; return; }
-      const fact = ent.fact ? state.facts[ent.fact] : null;
-      const r = canvas.getBoundingClientRect();
-      tip.innerHTML = `<b>${ent.fact ?? ent.id}</b><div>${fact ? fact.description : ''}</div><div class="meta">${ent.id} · ${ent.component} · since turn ${ent.since}</div>`;
-      tip.style.left = `${e.clientX - r.left + 14}px`;
-      tip.style.top = `${e.clientY - r.top + 14}px`;
-      tip.hidden = false;
-    });
-  });
-  canvas.addEventListener('pointerleave', () => (tip.hidden = true));
+  stage.onHover = (hit, x, y) => {
+    if (!hit || !snap) { tip.hidden = true; return; }
+    const factId = hit.fact ?? snap.entityFacts(hit.id);
+    const fact = factId ? snap.facts[factId] : null;
+    tip.innerHTML = `<b>${factId ?? hit.id}</b><div>${fact ? fact.description : ''}</div><div class="meta">${hit.id}${fact ? ` · since turn ${fact.since}` : ''}</div>`;
+    tip.style.left = `${x + 14}px`;
+    tip.style.top = `${y + 14}px`;
+    tip.hidden = false;
+  };
 
   loadRuns();
 }

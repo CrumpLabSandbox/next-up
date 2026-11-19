@@ -12,11 +12,17 @@
         <h1>next&#8209;up</h1>
         <select id="run" title="Run"></select>
         <span id="premise"></span>
+        <span id="ladder" hidden>
+          <span id="engine" class="badge">engine –</span>
+          <span id="budget" title="World budget (log scale): engine + world data, against the unlocked tier">
+            <span class="track"><i id="budget-limit"></i><i id="budget-used"></i></span>
+            <span id="budget-label"></span>
+          </span>
+        </span>
         <span id="status"></span>
       </header>
       <main>
         <section id="stage">
-          <canvas id="c"></canvas>
           <div id="modes" role="group" aria-label="Camera">
             <button data-mode="follow" class="on" title="Camera follows the wanderer (F)">Follow</button>
             <button data-mode="orbit" title="Orbit around the wanderer (O)">Orbit</button>

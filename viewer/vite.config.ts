@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const RUNS = fileURLToPath(new URL('../runs', import.meta.url));
+const WORK = fileURLToPath(new URL('../work', import.meta.url));
 const OUT = fileURLToPath(new URL('../dist', import.meta.url));
 
 const TYPES: Record<string, string> = {
@@ -12,7 +13,20 @@ const TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.png': 'image/png',
   '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.wasm': 'application/wasm',
+  '.md': 'text/markdown',
+  '.bin': 'application/octet-stream',
 };
+
+function serveFrom(root: string, rel: string, res: import('node:http').ServerResponse): boolean {
+  const file = path.normalize(path.join(root, rel));
+  if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return false;
+  res.setHeader('Content-Type', TYPES[path.extname(file)] ?? 'application/octet-stream');
+  res.setHeader('Cache-Control', 'no-store');
+  fs.createReadStream(file).pipe(res);
+  return true;
+}
 
 /** Run folders worth publishing (skips scratch output like _selftest). */
 function runDirs(): string[] {
@@ -42,16 +56,13 @@ function runsPlugin(): Plugin {
           res.end(JSON.stringify(runIndex()));
           return;
         }
-        if (url.startsWith('/runs/')) {
-          const file = path.normalize(path.join(RUNS, url.slice('/runs/'.length)));
-          if (!file.startsWith(RUNS + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+        // /work/ holds engine drafts the Engineer is still checking (dev only).
+        for (const [prefix, root] of [['/runs/', RUNS], ['/work/', WORK]] as const) {
+          if (!url.startsWith(prefix)) continue;
+          if (!serveFrom(root, url.slice(prefix.length), res)) {
             res.statusCode = 404;
             res.end('not found');
-            return;
           }
-          res.setHeader('Content-Type', TYPES[path.extname(file)] ?? 'application/octet-stream');
-          res.setHeader('Cache-Control', 'no-store');
-          fs.createReadStream(file).pipe(res);
           return;
         }
         next();
@@ -63,7 +74,7 @@ function runsPlugin(): Plugin {
       for (const d of runDirs()) {
         fs.cpSync(path.join(RUNS, d), path.join(dest, d), {
           recursive: true,
-          filter: (src) => !src.endsWith('.log') && path.basename(src) !== 'STOP',
+          filter: (src) => !src.endsWith('.log') && path.basename(src) !== 'STOP' && !src.includes(`${path.sep}src${path.sep}`),
         });
       }
       fs.writeFileSync(path.join(dest, 'index.json'), JSON.stringify(runIndex()));
@@ -76,6 +87,17 @@ export default defineConfig({
   base: './',
   plugins: [runsPlugin()],
   server: { fs: { allow: ['..'] } },
-  build: { outDir: OUT, emptyOutDir: true, chunkSizeWarningLimit: 1500 },
+  build: {
+    outDir: OUT,
+    emptyOutDir: true,
+    target: 'es2022',
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        host: fileURLToPath(new URL('./engine-host.html', import.meta.url)),
+      },
+    },
+  },
   logLevel: 'warn',
 });

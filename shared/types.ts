@@ -139,6 +139,8 @@ export interface RenderEvent {
   final?: boolean;
   shot: string | null;
   triangles: number;
+  /** Ladder runs: total budgeted bytes (engine + world) at this render. */
+  bytes?: number;
   errors: string[];
   ts: string;
 }
@@ -155,6 +157,44 @@ export interface DesignerEvent {
   suggestions: DesignSuggestion[];
   styleGuide: string;
   overview: string | null; // overview screenshot the Designer looked at
+  /** Ladder runs: the Designer may ask for the next budget tier or a new engine. */
+  requestUnlock?: boolean;
+  unlockReason?: string;
+  engineRequest?: string;
+  ts: string;
+}
+
+/** Ladder runs: the world's size budget moved to a new tier. */
+export interface BudgetEvent {
+  turn: number;
+  type: 'budget';
+  tier: number;
+  limit: number; // bytes
+  reason: string;
+  ts: string;
+}
+
+/** Ladder runs: an Engineer session that tried to build a new engine version. */
+export interface EngineerEvent {
+  turn: number;
+  type: 'engineer';
+  request: string;
+  notes: string;
+  ok: boolean;
+  version: string | null;
+  problems: string[];
+  minutes: number;
+  ts: string;
+}
+
+/** Ladder runs: from here on the world renders with this engine version. */
+export interface EngineEvent {
+  turn: number;
+  type: 'engine';
+  version: string;
+  from: string | null;
+  notes: string;
+  bytes: number;
   ts: string;
 }
 
@@ -165,7 +205,9 @@ export interface SystemEvent {
   ts: string;
 }
 
-export type TimelineEvent = PlayerEvent | NarratorEvent | BuilderEvent | RenderEvent | DesignerEvent | SystemEvent;
+export type TimelineEvent =
+  | PlayerEvent | NarratorEvent | BuilderEvent | RenderEvent | DesignerEvent | SystemEvent
+  | BudgetEvent | EngineerEvent | EngineEvent;
 
 export interface RunInfo {
   id: string;
@@ -175,6 +217,10 @@ export interface RunInfo {
   maxTurns: number;
   /** Designer + polish pass every N turns (0 = no designer). Absent = 0. */
   designEvery?: number;
+  /** 'ladder' runs use swappable engines and a growing budget; absent = legacy three.js runtime. */
+  mode?: 'ladder';
+  engine?: string;
+  tier?: number;
   status: 'running' | 'complete' | 'failed' | 'stopped';
   turnsCompleted: number;
   calls: number;

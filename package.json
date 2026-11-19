@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "viewer": "vite --config viewer/vite.config.ts",
-    "world": "tsx orchestrator/run.ts",
+    "world": "tsx orchestrator/run-ladder.ts",
     "typecheck": "tsc --noEmit",
     "selftest": "tsx orchestrator/selftest.ts",
-    "build": "vite build --config viewer/vite.config.ts"
+    "build": "vite build --config viewer/vite.config.ts",
+    "world:legacy": "tsx orchestrator/run.ts"
   },
   "dependencies": {
     "three": "^0.187.0"
@@ -15,6 +16,7 @@
   "devDependencies": {
     "@types/node": "^26.6.6",
     "@types/three": "^0.187.0",
+    "esbuild": "^0.28.2",
     "playwright": "^1.65.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

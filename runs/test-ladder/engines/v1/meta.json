@@ -1,0 +1,5 @@
+{
+  "version": "v1",
+  "notes": "Engine v1 is a tiny WebGL renderer (about 3.7 KB with the migrated world; the check reports exactly 4.0 KB of 4.0 KB, so there is almost no room left). The 2D boxes become real 3D, seen through a perspective camera behind the Wanderer. Faces are shaded by a cool directional light plus ambient, distance fog fades everything into a gradient sky, and the ember's flickering light casts a warm falloff pool on the cold stone ground. The new `light` op adds more flickering point lights, up to four.\n\nMigration keeps both story things. It brightens the ground so the ember pool shows, and it adds a light to the glowing distant ember.\n\nThe check passes and both preview pictures look right, but two things fell short:\n- The Wanderer is quite dark and the ember is small. Fixing either would have pushed the build back over budget.\n- The Builder has essentially no room to grow before the next engine. To fit, I dropped id-name validation on `set` and `light` and cut the flicker to one sine wave.",
+  "bytes": 3780
+}

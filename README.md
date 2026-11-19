@@ -15,14 +15,24 @@ Four Claude agents take turns:
 
 A turn is: Wanderer → Narrator → Builder → render → Designer → Builder (polish) → render. Both renders are kept, so you can see what each polish changed. Every step is appended to `runs/<id>/timeline.jsonl`. The world at any point is just the replay of that log, so the viewer can play the whole thing back, scrub and watch things materialize.
 
+## Ladder runs (world-03 onward)
+
+New runs grow in **orders of magnitude**. The whole world (engine code, libraries and world data) has to fit a byte budget that starts at **4 KB** and climbs ×4 per tier (16 KB → 64 KB → 256 KB → 1 MB → 4 MB → 16 MB). The Graphic Designer can ask for the next tier (at most one every 5 turns) and can order a **new engine**. A fifth agent, the **Engineer**, then writes it: a tool-using Claude Code session in `work/<run>/vN/` that may install npm libraries (their bytes count).
+
+- The **engine contract** (`orchestrator/prompts/engine-contract.md`): each engine is `world.js` (pure: `initialWorld`, `migrate`, `reduce`, `describe`, `facts`) plus `engine.js` (`createEngine(canvas)` → `setWorld`, `setCamera`, `getCamera`, `renderStill`, …). Each engine defines its own world format and ops (documented in its `OPS.md` for the Builder).
+- `orchestrator/engine-tool.mjs check` builds a draft and checks it: exports, a deterministic migration of the live world that keeps every story fact, the budget, a real headless render, and pixel-identical repeat renders. A draft ships only if it passes.
+- Passing engines are **frozen** in `runs/<id>/engines/vN/`, and the timeline records the switch. The viewer runs each engine in its own frame (`viewer/engine-host.html`), rebuilds the world through each engine's own `reduce` and `migrate`, and cross-fades at a handoff, passing the camera across.
+- `engine-seed/` is v0: about 3 KB of flat boxes and cones on a 2D canvas.
+
 ## Use
 
 ```bash
 npm install
 npx playwright install chromium-headless-shell   # once, for screenshots
 
-npm run world -- --turns 50                  # new run (uses your Claude subscription via `claude -p`)
-npm run world -- --turns 50 --design-every 0 # no Designer (or 3 = a design pass every 3rd turn)
+npm run world -- --turns 50                  # new ladder run (uses your Claude subscription via `claude -p`)
+npm run world -- --turns 50 --engineer-model opus   # optionally a stronger model for engine rewrites
+npm run world:legacy -- --turns 50           # world-01/02 style: fixed three.js runtime
 npm run world -- --turns 50 --premise "..."  # optional seed for the world
 npm run world -- --resume <run-id>           # continue after a crash or stop
 touch runs/<run-id>/STOP                     # stop cleanly after the current turn

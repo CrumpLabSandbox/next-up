@@ -1,7 +1,7 @@
 // Thin wrapper around the `claude` CLI in headless mode. Unsetting the API key
 // makes calls bill to the logged-in Claude subscription.
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { appendFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -92,4 +92,71 @@ export async function callClaude<T>(opts: CallOptions): Promise<CallResult<T>> {
     }
   }
   throw lastErr;
+}
+
+export interface AgentOptions {
+  label: string;
+  model: string;
+  cwd: string;
+  appendSystem: string;
+  prompt: string;
+  allowedTools: string[];
+  timeoutMs: number;
+  logFile?: string;
+}
+
+/**
+ * Runs a tool-using Claude Code session (file edits auto-accepted inside `cwd`,
+ * plus the listed tools). Resolves with the final message, or rejects on timeout.
+ */
+export function runAgent(opts: AgentOptions): Promise<{ text: string; durationMs: number }> {
+  const args = [
+    '-p', opts.prompt,
+    '--output-format', 'stream-json',
+    '--verbose',
+    '--model', opts.model,
+    '--setting-sources', '',
+    '--strict-mcp-config',
+    '--no-session-persistence',
+    '--permission-mode', 'acceptEdits',
+    '--allowedTools', opts.allowedTools.join(' '),
+    '--append-system-prompt', opts.appendSystem,
+  ];
+  const env = { ...process.env };
+  delete env.ANTHROPIC_API_KEY;
+  delete env.CLAUDE_CODE_OAUTH_TOKEN;
+  delete env.CLAUDECODE;
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const child = spawn('claude', args, { cwd: opts.cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let buf = '';
+    let result: { result?: string; is_error?: boolean } | null = null;
+    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(`${opts.label}: timed out after ${opts.timeoutMs / 60000} min`)); }, opts.timeoutMs);
+    child.stdout.on('data', (d) => {
+      buf += d;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i);
+        buf = buf.slice(i + 1);
+        if (!line.startsWith('{')) continue;
+        try {
+          const m = JSON.parse(line);
+          if (m.type === 'result') result = m;
+          if (opts.logFile && m.type === 'assistant') {
+            for (const c of m.message?.content ?? []) {
+              const s = c.type === 'text' ? c.text : c.type === 'tool_use' ? `[${c.name}] ${JSON.stringify(c.input).slice(0, 300)}` : '';
+              if (s) appendFileSync(opts.logFile, s + '\n');
+            }
+          }
+        } catch { /* partial line */ }
+      }
+    });
+    child.stderr.on('data', () => {});
+    child.on('error', (e) => { clearTimeout(timer); reject(e); });
+    child.on('close', () => {
+      clearTimeout(timer);
+      if (!result) reject(new Error(`${opts.label}: no result`));
+      else resolve({ text: String(result.result ?? ''), durationMs: Date.now() - started });
+    });
+  });
 }
