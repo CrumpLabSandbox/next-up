@@ -1,0 +1,10 @@
+{
+  "id": "world-01",
+  "created": "2026-11-19T15:26:23.306Z",
+  "premise": "",
+  "model": "sonnet",
+  "maxTurns": 50,
+  "status": "running",
+  "turnsCompleted": 31,
+  "calls": 95
+}

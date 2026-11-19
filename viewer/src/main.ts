@@ -44,7 +44,7 @@ function startViewer() {
   const speed = () => Number($<HTMLSelectElement>('#speed').value) || 1;
 
   async function loadRuns() {
-    const runs: RunInfo[] = await fetch('/api/runs').then((r) => r.json());
+    const runs: RunInfo[] = await fetch('runs/index.json').then((r) => r.json());
     const sel = $<HTMLSelectElement>('#run');
     sel.innerHTML = runs.map((r) => `<option value="${r.id}">${r.id} · ${r.turnsCompleted}/${r.maxTurns} · ${r.status}</option>`).join('');
     $('#empty').hidden = runs.length > 0;
@@ -57,8 +57,8 @@ function startViewer() {
   }
 
   async function fetchRun(id: string) {
-    const info: RunInfo = await fetch(`/runs/${id}/run.json`).then((r) => r.json());
-    const text = await fetch(`/runs/${id}/timeline.jsonl`).then((r) => (r.ok ? r.text() : ''));
+    const info: RunInfo = await fetch(`runs/${id}/run.json`, { cache: 'no-store' }).then((r) => r.json());
+    const text = await fetch(`runs/${id}/timeline.jsonl`, { cache: 'no-store' }).then((r) => (r.ok ? r.text() : ''));
     const evs = text.split('\n').filter(Boolean).map((l) => JSON.parse(l) as TimelineEvent);
     return { info, evs };
   }
@@ -185,7 +185,7 @@ function startViewer() {
     const c = Math.round(((e.clientX - r.left) / r.width) * events.length);
     const shot = [...events.slice(0, Math.max(1, c))].reverse().find((ev) => ev.type === 'render' && ev.shot);
     if (!shot || shot.type !== 'render' || !run) { thumb.hidden = true; return; }
-    thumb.src = `/runs/${run.id}/${shot.shot}`;
+    thumb.src = `runs/${run.id}/${shot.shot}`;
     thumb.style.left = `${e.clientX - r.left}px`;
     thumb.hidden = false;
   };

@@ -44,7 +44,7 @@ export function renderEvent(ev: TimelineEvent, runId: string): HTMLElement | nul
       return el(`<div class="msg builder"><div class="who">Builder${ev.attempts > 1 ? ` · ${ev.attempts} tries` : ''}</div>${builderBody(ev)}</div>`);
     case 'render':
       if (!ev.shot && !ev.errors.length) return null;
-      return el(`<div class="msg system">${ev.shot ? `<img class="shot" loading="lazy" src="/runs/${esc(runId)}/${esc(ev.shot)}" alt="What the wanderer sees after turn ${ev.turn}">` : ''}${ev.errors.map((e) => `<div>⚠ ${esc(e)}</div>`).join('')}<div>${ev.triangles.toLocaleString()} triangles</div></div>`);
+      return el(`<div class="msg system">${ev.shot ? `<img class="shot" loading="lazy" src="runs/${esc(runId)}/${esc(ev.shot)}" alt="What the wanderer sees after turn ${ev.turn}">` : ''}${ev.errors.map((e) => `<div>⚠ ${esc(e)}</div>`).join('')}<div>${ev.triangles.toLocaleString()} triangles</div></div>`);
     case 'system':
       return el(`<div class="msg system">${esc(ev.message)}</div>`);
   }

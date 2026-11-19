@@ -6,7 +6,8 @@
     "viewer": "vite --config viewer/vite.config.ts",
     "world": "tsx orchestrator/run.ts",
     "typecheck": "tsc --noEmit",
-    "selftest": "tsx orchestrator/selftest.ts"
+    "selftest": "tsx orchestrator/selftest.ts",
+    "build": "vite build --config viewer/vite.config.ts"
   },
   "dependencies": {
     "three": "^0.187.0"

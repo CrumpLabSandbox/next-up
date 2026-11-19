@@ -2,6 +2,8 @@
 
 An emergent 3D world that doesn't exist until someone looks at it.
 
+**Watch the replays:** https://crumplabsandbox.github.io/next-up/
+
 Three Claude agents take turns:
 
 | Agent | Sees | Does |
@@ -25,6 +27,7 @@ touch runs/<run-id>/STOP                     # stop cleanly after the current tu
 
 npm run viewer                               # http://localhost:5173 — replay, live-follow a running world
 npm run selftest                             # no model calls: checks components + headless render
+npm run build                                # static site in dist/ (runs included), deployed to Pages on push to main
 ```
 
 Viewer: play/pause (space), step (← →), scrub, speed. Camera modes: **Follow** (story camera), **Orbit**, **Walk** (WASD/arrows, Shift to run, drag to look, Esc back to the story). Hover objects to see the fact they came from.
