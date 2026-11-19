@@ -1,0 +1,5 @@
+{
+  "version": "v8",
+  "notes": "Engine v8 passes the check, using 679 KB of the 4 MB budget, and all 51 story facts survive migration. `migrate()` is the identity, and the v6 fallback is still in place.\n\nThe sun is now a bright, solid disc with the dark door slit silhouetted against it, and the glare no longer washes out the follow view. The dunes have sharper crests with visible sand grain, a gold rim light and bootprints trailing behind the Wanderer. Violet horizon ridges, gold-to-violet haze, drifting wind-blown sand with glints, and a pulsing `sun_road` with travelling glints make up the rest of the look. The camera sways gently, and the Wanderer's cloak and hood move in the wind.\n\nI checked only the still frames, not the live animation. In `renderStill` the sway and flowing motion are frozen at the 2-second mark. I added no true volumetric light and no auto-exposure; exposure is tuned instead. The sky's own sun is still drawn at the upper right, so the world briefly shows two suns.\n\nI updated `OPS.md` for the Builder with the new automatic behaviours, and the ops themselves are unchanged.",
+  "bytes": 675557
+}
