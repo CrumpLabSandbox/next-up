@@ -1,0 +1,2 @@
+// Soft violet-gold additive pool of mixed lamplight on ash. params s (m)
+export function build(T,p,c){const s=p.s||8,g=new T.Group();const t=c.dataTexture(64,64,(u,v)=>{const a=Math.max(0,1-Math.hypot(u-.5,v-.5)*2),k=255*a*a;return[k,k,k]});const mk=(col,o,sc,x)=>{const m=new T.Mesh(new T.PlaneGeometry(s*sc,s*sc),new T.MeshBasicMaterial({color:col,alphaMap:t,transparent:true,opacity:o,blending:T.AdditiveBlending,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.set(x,0,0);g.add(m)};mk('#a07ad8',.22,1,0);mk('#ffb070',.12,.7,.6);mk('#6fa8ff',.12,.7,-.6);return g}

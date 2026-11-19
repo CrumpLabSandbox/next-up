@@ -1,0 +1,2 @@
+// Copper hand-rail and boot plates at the rear of the keeper sled; params w (m)
+export function build(T,p,c){const g=new T.Group(),w=p.w||.9,cu=c.pbr('#c4703c',{roughness:.3,metalness:.8}),pl=c.pbr('#8a5a30',{roughness:.8});const a=(G,m,x,y,z)=>{const o=new T.Mesh(G,m);o.position.set(x,y,z);g.add(o);return o};[-1,1].map(s=>{a(new T.CylinderGeometry(.018,.022,.6,7),cu,s*w*.45,.3,0);a(new T.BoxGeometry(.2,.02,.3),pl,s*.22,.01,.35);a(new T.TorusGeometry(.03,.008,5,8),cu,s*w*.45,.05,0)});const b=a(new T.CylinderGeometry(.016,.016,w,7),cu,0,.6,0);b.rotation.z=Math.PI/2;return g}
