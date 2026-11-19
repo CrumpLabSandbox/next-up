@@ -6,9 +6,9 @@
   "maxTurns": 50,
   "designEvery": 1,
   "mode": "ladder",
-  "engine": "v11",
+  "engine": "v13",
   "tier": 6,
-  "status": "running",
-  "turnsCompleted": 40,
-  "calls": 222
+  "status": "complete",
+  "turnsCompleted": 50,
+  "calls": 274
 }
