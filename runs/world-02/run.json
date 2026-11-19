@@ -5,7 +5,7 @@
   "model": "sonnet",
   "maxTurns": 50,
   "designEvery": 1,
-  "status": "running",
-  "turnsCompleted": 47,
-  "calls": 242
+  "status": "complete",
+  "turnsCompleted": 50,
+  "calls": 257
 }

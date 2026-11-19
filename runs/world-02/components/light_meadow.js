@@ -1,9 +1,9 @@
-// Dark honey-to-plum meadow with large soft plum patches, tufts and drifting white sparks; top at y=0; params: radius, sparks, tufts
+// Dark honey-to-plum meadow with large soft plum patches, soft dark tufts and drifting white sparks; fades beyond 28 m; top at y=0; params: radius, sparks, tufts
 export function build(THREE, p, ctx) {
   const g = new THREE.Group();
   const R = p.radius || 40, add = THREE.AdditiveBlending;
-  const at = ctx.dataTexture(64, 64, (u, v) => { const q = Math.min(1, Math.hypot(u - 0.5, v - 0.5) * 2); const s = Math.max(0, 1 - q); const k = Math.min(1, s * 2.2); const c = k * k * (3 - 2 * k) * 255; return [c, c, c]; });
-  const gradTex = ctx.dataTexture(32, 32, (u, v) => { const q = Math.min(1, Math.hypot(u - 0.5, v - 0.5) * 2); return [138 - 32 * q, 82 - 20 * q, 64 + 26 * q]; });
+  const at = ctx.dataTexture(64, 64, (u, v) => { const q = Math.min(1, Math.hypot(u - 0.5, v - 0.5) * 2); const s = Math.max(0, 1 - q); const k = Math.min(1, s / 0.3); const c = k * k * (3 - 2 * k) * 255; return [c, c, c]; });
+  const gradTex = ctx.dataTexture(32, 32, (u, v) => { const q = Math.min(1, Math.hypot(u - 0.5, v - 0.5) * 2); return [122 - 28 * q, 70 - 17 * q, 56 + 26 * q]; });
   const base = new THREE.Mesh(new THREE.CircleGeometry(R, 40), new THREE.MeshBasicMaterial({ map: gradTex, color: '#ffffff', alphaMap: at, transparent: true, opacity: 1.0, depthWrite: false, fog: true }));
   base.rotation.x = -Math.PI / 2; base.renderOrder = 8; g.add(base);
   const glow = new THREE.Mesh(new THREE.CircleGeometry(R * 0.7, 32), new THREE.MeshBasicMaterial({ color: '#ffb870', alphaMap: at, transparent: true, opacity: 0.005, depthWrite: false, blending: add, fog: false }));
@@ -21,17 +21,19 @@ export function build(THREE, p, ctx) {
   for (let i = 0; i < 12; i++) patch('#6a3e5a', 0.3, 5, 9, i + 32, -4, 8.9, 14);
   for (let i = 0; i < 24; i++) patch('#6a3e5a', 0.3, 5, 9, i + 44, 0.9, -2.9, 14);
   for (let i = 0; i < 20; i++) patch('#6a3e5a', 0.3, 10, 16, i + 68, 0.9, -2.9, 25);
+  for (let i = 0; i < 12; i++) patch('#5e3552', 0.3, 8, 14, i + 90, 0.9, -2.9, 12);
+  for (let i = 0; i < 14; i++) patch('#5e3552', 0.35, 6, 12, i + 110, 6.6, -16.8, 10);
   const n = p.tufts || 420, extra = 150;
-  const cone = new THREE.ConeGeometry(0.12, 0.3, 5); cone.translate(0, 0.15, 0);
-  const mesh = new THREE.InstancedMesh(cone, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.4, depthWrite: false, fog: false }), n + extra);
+  const cone = new THREE.ConeGeometry(0.04, 0.12, 5); cone.translate(0, 0.06, 0);
+  const mesh = new THREE.InstancedMesh(cone, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.25, depthWrite: false, fog: false }), n + extra);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), pos = new THREE.Vector3(), sc = new THREE.Vector3(), c = new THREE.Color();
   let placed = 0, guard = 0;
   function put(x, z) {
     e.set(ctx.range(-0.2, 0.2), ctx.range(0, 3), ctx.range(-0.2, 0.2)); q.setFromEuler(e);
-    const s = ctx.range(0.8, 1.3);
-    pos.set(x, 0.02, z); sc.set(s, ctx.range(1, 1.67), s);
+    const s = ctx.range(0.8, 1.2);
+    pos.set(x, 0.02, z); sc.set(s, ctx.range(0.85, 1.2), s);
     m.compose(pos, q, sc); mesh.setMatrixAt(placed, m);
-    c.set(ctx.pick(['#a86a3c', '#8a5a40'])); mesh.setColorAt(placed, c);
+    c.set(ctx.pick(['#6a4048', '#7a4a50'])); mesh.setColorAt(placed, c);
     placed++;
   }
   while (placed < n && guard++ < n * 8) {
@@ -64,7 +66,7 @@ export function update(obj, t) {
     const s = u.seeds[i];
     a[i * 3] = Math.cos(s[0]) * s[1] + Math.sin(t * s[3] + s[2]) * 2;
     a[i * 3 + 1] = s[4] + 0.4 * Math.sin(t * 0.5 + s[2]) + ((t * 0.1 + s[2]) % 1) * 0.6;
-    a[i * 3 + 2] = Math.sin(s[0]) * s[1] + Math.cos(t * s[3] + s[2]) * 2;
+    a[i * 3 + 2] = Math.sin(s[0]) * s[1] + Math.cos(t * 0.5 + s[2]) * 2;
   }
   u.pts.geometry.attributes.position.needsUpdate = true;
   u.glow.material.opacity = 0.005 + 0.001 * Math.sin(t * 0.6);
