@@ -1,0 +1,5 @@
+{
+  "version": "v1",
+  "notes": "Engine v1 is a hand-written WebGL renderer, and the check passes with both facts carried over. The world now has real depth: a soft-edged glowing dust disc fades out underfoot. The Wanderer is a lit figure standing in it. Fog melts everything into the dark, and the far lantern sits behind a flickering amber halo that lights nearby surfaces. A few dust motes drift slowly through the air. I looked at both check pictures and they match that description.\n\nThe budget is the problem. The engine and world use 4,092 of 4,096 bytes, so the Builder has essentially no room to add anything and should prefer replacing things over adding them. I didn't reach the 20% headroom target; `OPS.md` says this plainly.\n\nThings I left out or compromised on:\n- Cones are gone (they draw as boxes), and there are no error reports or picking.\n- Ground fog is per-vertex, so the ground plane renders dark rather than fading smoothly into the sky.\n- The Wanderer is a single plain box without a head.",
+  "bytes": 3860
+}
