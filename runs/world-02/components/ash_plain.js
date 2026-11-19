@@ -1,20 +1,39 @@
-// Glowing ash disc with vertex-color gradient, softened dark patches, mounds, ridges and round glows; params: radius, color, glow, mounds, lanternZ
+// Glowing ash ground (grid with vertex-color gradient, cells under the ice sea omitted so the stairwell can open), mounds, ridges, round glows; params: radius, color, glow, mounds, lanternZ
 export function build(THREE, p, ctx) {
   const g = new THREE.Group();
   const r = p.radius || 160;
   const wz = (p.lanternZ || -40) - 3;
-  const geo = new THREE.RingGeometry(0.01, r, 48, 14);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position;
-  const cols = new Float32Array(pos.count * 3);
+  const cell = 5;
+  const N = Math.round(2 * r / cell);
   const near = new THREE.Color('#a9b1c4'), far = new THREE.Color('#6c7690'), c = new THREE.Color();
-  for (let i = 0; i < pos.count; i++) {
-    const d = Math.hypot(pos.getX(i), pos.getZ(i) - wz);
-    c.copy(near).lerp(far, Math.min(1, d / 60));
-    const n = 0.92 + 0.08 * ctx.noise2(pos.getX(i) * 0.1, pos.getZ(i) * 0.1);
-    cols[i * 3] = c.r * n; cols[i * 3 + 1] = c.g * n; cols[i * 3 + 2] = c.b * n;
+  const pos = new Float32Array((N + 1) * (N + 1) * 3);
+  const cols = new Float32Array((N + 1) * (N + 1) * 3);
+  for (let j = 0; j <= N; j++) {
+    for (let i = 0; i <= N; i++) {
+      const k = j * (N + 1) + i;
+      const x = -r + i * cell, z = -r + j * cell;
+      pos[k * 3] = x; pos[k * 3 + 1] = 0; pos[k * 3 + 2] = z;
+      const d = Math.hypot(x, z - wz);
+      c.copy(near).lerp(far, Math.min(1, d / 60));
+      const n = 0.92 + 0.08 * ctx.noise2(x * 0.1, z * 0.1);
+      cols[k * 3] = c.r * n; cols[k * 3 + 1] = c.g * n; cols[k * 3 + 2] = c.b * n;
+    }
   }
+  const idx = [];
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const cx = -r + (i + 0.5) * cell, cz = -r + (j + 0.5) * cell;
+      if (Math.hypot(cx, cz) > r) continue;
+      if (cz > 0 && cx > -28 && cx < 86) continue;
+      const a = j * (N + 1) + i, b = a + 1, cc = a + N + 1, d = cc + 1;
+      idx.push(a, cc, b, b, cc, d);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
   const m = ctx.mat('#ffffff', { emissive: '#6c7690', emissiveIntensity: p.glow || 0.3 });
   m.vertexColors = true;
   g.add(new THREE.Mesh(geo, m));
