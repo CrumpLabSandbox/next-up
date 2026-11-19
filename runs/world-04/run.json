@@ -1,0 +1,13 @@
+{
+  "id": "world-04",
+  "created": "2026-11-19T23:27:27.770Z",
+  "premise": "",
+  "model": "sonnet",
+  "maxTurns": 50,
+  "designEvery": 1,
+  "status": "running",
+  "turnsCompleted": 0,
+  "calls": 0,
+  "mode": "tiered",
+  "tier": 0
+}
