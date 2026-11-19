@@ -2,7 +2,7 @@ import { WorldView } from './runtime/world-view';
 import { Feed } from './ui/feed';
 import { Stage } from './stage';
 import { snapshot, type Snapshot } from './model';
-import { TIERS, fmtBytes } from '../../shared/ladder';
+import { TIERS, THREE_TIERS, fmtBytes, fmtTier } from '../../shared/ladder';
 import type { RunInfo, TimelineEvent, WorldState } from '../../shared/types';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -18,7 +18,7 @@ if (params.has('capture')) {
     async render(state: WorldState, which: 'story' | 'overview' = 'story') {
       await view.setState(state, false);
       view.renderStill(which);
-      return { errors: view.drainErrors(), triangles: view.triangleCount() };
+      return { errors: view.drainErrors(), triangles: view.triangleCount(), lights: view.lightCount() };
     },
   };
   (window as unknown as Record<string, unknown>).__nextupReady = true;
@@ -73,7 +73,7 @@ function startViewer() {
     run = info;
     events = evs;
     $('#premise').textContent = info.premise;
-    $('#ladder').hidden = info.mode !== 'ladder';
+    $('#ladder').hidden = info.mode !== 'ladder' && info.mode !== 'tiered';
     feed.clear();
     await seek(0, false);
     updateStatus();
@@ -123,11 +123,12 @@ function startViewer() {
 
   /** Ladder header: which engine is live and how full the budget is (log scale). */
   function updateLadder(s: Snapshot) {
-    if (run?.mode !== 'ladder') return;
+    if (run?.mode !== 'ladder' && run?.mode !== 'tiered') return;
     const eng = $('#engine');
-    eng.textContent = `engine ${s.engine ?? '–'}`;
-    eng.title = s.engineNotes;
-    const lo = Math.log(TIERS[0] / 4), hi = Math.log(TIERS[TIERS.length - 1]);
+    eng.textContent = run.mode === 'tiered' ? (s.engine ?? '') : `engine ${s.engine ?? '–'}`;
+    eng.title = s.engineNotes || (run.mode === 'tiered' ? fmtTier(THREE_TIERS[Math.max(0, s.tier)]) : '');
+    const ladder = run.mode === 'tiered' ? THREE_TIERS.map((t) => t.bytes) : TIERS;
+    const lo = Math.log(ladder[0] / 4), hi = Math.log(ladder[ladder.length - 1]);
     const frac = (b: number) => `${Math.max(0, Math.min(1, (Math.log(Math.max(1, b)) - lo) / (hi - lo))) * 100}%`;
     $('#budget-limit').style.width = frac(s.limit);
     $('#budget-used').style.width = frac(s.bytes ?? 0);
@@ -162,6 +163,7 @@ function startViewer() {
       : ev.type === 'builder' ? 3000
       : ev.type === 'designer' ? Math.min(8000, 2500 + ev.critique.length * 15)
       : ev.type === 'engineer' ? 4500
+      : ev.type === 'reviewer' ? Math.min(10000, 3000 + ev.assessment.length * 15)
       : ev.type === 'engine' ? 4000
       : ev.type === 'budget' ? 2500
       : 1000;

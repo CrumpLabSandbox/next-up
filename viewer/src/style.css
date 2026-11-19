@@ -9,6 +9,7 @@
   --builder: #9fe0a8;
   --designer: #f0a6d4;
   --engineer: #ffb46b;
+  --reviewer: #7fe0cf;
   --budget: #c9a0ff;
   --system: #a0a4b8;
   --bad: #ff8f8f;
@@ -66,6 +67,7 @@ main { display: grid; grid-template-columns: 1fr 400px; min-height: 0; }
 .msg.builder { border-color: var(--builder); } .msg.builder .who { color: var(--builder); }
 .msg.designer { border-color: var(--designer); } .msg.designer .who { color: var(--designer); }
 .msg.builder.polish { border-left-style: dashed; }
+.msg.reviewer { border-color: var(--reviewer); background: rgba(127, 224, 207, 0.04); } .msg.reviewer .who { color: var(--reviewer); }
 .msg.engineer { border-color: var(--engineer); } .msg.engineer .who { color: var(--engineer); }
 .msg .request { color: var(--dim); font-size: 13px; margin-bottom: 4px; }
 .banner { margin: 8px 0; padding: 8px 10px; border-radius: 8px; font-size: 13px; animation: fadein 0.4s; }

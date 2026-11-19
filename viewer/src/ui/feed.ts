@@ -58,6 +58,10 @@ export function renderEvent(ev: TimelineEvent, runId: string): HTMLElement | nul
       return el(`<div class="banner budget"><b>▲ Budget ${ev.tier === 0 ? 'starts at' : 'unlocked:'} ${fmtBytes(ev.limit)}</b>${esc(ev.reason)}</div>`);
     case 'engineer':
       return el(`<div class="msg engineer"><div class="who">Engineer · ${ev.ok ? `built ${esc(ev.version ?? '')}` : 'failed'} · ${ev.minutes} min</div><div class="request">Request: ${esc(ev.request)}</div><div>${esc(ev.notes)}</div>${ev.problems.length ? `<div class="chips">${ev.problems.map((p) => `<span class="chip bad">${esc(p)}</span>`).join('')}</div>` : ''}</div>`);
+    case 'reviewer': {
+      const sec = (label: string, text: string) => (text ? `<details><summary>${label}</summary><div class="guide">${esc(text)}</div></details>` : '');
+      return el(`<div class="msg reviewer"><div class="who">Reviewer</div><div>${esc(ev.assessment)}</div>${sec('narrative → Narrator', ev.narrative)}${sec('visual → Designer', ev.visual)}${sec('detail → Builder', ev.builder)}${sec('questions → Wanderer', ev.wanderer)}${sec('viewer experience', ev.experience)}</div>`);
+    }
     case 'engine':
       return el(`<div class="banner engine"><b>⚙ Engine ${esc(ev.version)}${ev.from ? ` takes over from ${esc(ev.from)}` : ''} · ${fmtBytes(ev.bytes)}</b>${esc(ev.notes)}</div>`);
     case 'system':

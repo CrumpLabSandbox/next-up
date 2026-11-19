@@ -1,0 +1,13 @@
+{
+  "id": "test-tiered",
+  "created": "2026-11-19T23:20:19.290Z",
+  "premise": "",
+  "model": "sonnet",
+  "maxTurns": 3,
+  "designEvery": 1,
+  "status": "complete",
+  "turnsCompleted": 3,
+  "calls": 24,
+  "mode": "tiered",
+  "tier": 0
+}

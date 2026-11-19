@@ -11,7 +11,7 @@ mkdirSync(out, { recursive: true });
 
 const s = emptyWorld();
 const ops = [
-  { op: 'environment', skyTop: '#2a3a66', skyBottom: '#c98f6a', fogColor: '#8a7a80', fogDensity: 0.02, sunIntensity: 1, ambient: 0.5 },
+  { op: 'environment', skyMode: 'physical', skyTop: '#3d6fb0', skyBottom: '#e8c9a8', sunColor: '#ffd9a0', sunDirection: [0.5, 0.12, -1], fogColor: '#d8c4b0', fogDensity: 0.01, sunIntensity: 1.2, ambient: 0.4, bloom: 0.6, exposure: 0.9, envLight: 0.4 },
   {
     op: 'defineComponent', name: 'ground', doc: 'params: radius, color',
     code: `export function build(THREE, p, ctx) {

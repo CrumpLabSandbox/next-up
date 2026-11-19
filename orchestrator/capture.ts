@@ -29,14 +29,14 @@ export class Capture {
   }
 
   /** Renders `state` and saves a JPEG. Returns runtime errors and the triangle count. */
-  async render(state: WorldState, file: string, view: 'story' | 'overview' = 'story'): Promise<{ errors: string[]; triangles: number }> {
+  async render(state: WorldState, file: string, view: 'story' | 'overview' = 'story'): Promise<{ errors: string[]; triangles: number; lights: number }> {
     this.pageErrors = [];
     const res = await this.page.evaluate(
-      async ([s, v]) => (window as unknown as { __nextup: { render(s: unknown, v: string): Promise<{ errors: string[]; triangles: number }> } }).__nextup.render(s, v as string),
+      async ([s, v]) => (window as unknown as { __nextup: { render(s: unknown, v: string): Promise<{ errors: string[]; triangles: number; lights: number }> } }).__nextup.render(s, v as string),
       [state as unknown as Record<string, unknown>, view] as const,
     );
     await this.page.screenshot({ path: file, type: 'jpeg', quality: 72 });
-    return { errors: [...res.errors, ...this.pageErrors], triangles: res.triangles };
+    return { errors: [...res.errors, ...this.pageErrors], triangles: res.triangles, lights: res.lights };
   }
 
   async stop() {

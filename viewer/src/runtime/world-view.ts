@@ -2,6 +2,12 @@
 // can be replayed forwards (with materialize animations) or scrubbed instantly.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { COMPONENT_LIB } from '../../../shared/component-lib.js';
 import { makeCtx, moduleUrl, countTriangles } from '../../../shared/component-api.js';
 import type { Entity, WorldState } from '../../../shared/types';
 import { Atmosphere } from './atmosphere';
@@ -54,6 +60,8 @@ export class WorldView {
   readonly camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 2000);
   readonly avatar = new Avatar();
   private atmo: Atmosphere;
+  private composer: EffectComposer;
+  private bloom: UnrealBloomPass;
   private orbit: OrbitControls;
   private live = new Map<string, Live>();
   private dying: Live[] = [];
@@ -85,6 +93,17 @@ export class WorldView {
     this.atmo = new Atmosphere(env);
     this.scene.fog = this.atmo.fog;
     this.scene.add(this.atmo.group, this.avatar.group);
+
+    // Image-based light from a neutral studio environment; strength comes from env.envLight.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0;
+
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(960, 540), 0, 0.5, 0.9);
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
 
     this.orbit = new OrbitControls(this.camera, canvas);
     this.orbit.enabled = false;
@@ -186,7 +205,7 @@ export class WorldView {
   }
 
   private async build(e: Entity, code: string, sig: string, state: WorldState): Promise<Live> {
-    const ctx = makeCtx(THREE, e.id);
+    const ctx = makeCtx(THREE, e.id, COMPONENT_LIB);
     const root = new THREE.Group();
     const mid = new THREE.Group();
     root.add(mid);
@@ -292,7 +311,26 @@ export class WorldView {
     this.camera.lookAt(this.lookAt);
     for (let i = 0; i < 40; i++) this.atmo.update(0.1, this.avatar.position, this.glowOpacity());
     this.updateEntities(0.016);
-    this.renderer.render(this.scene, this.camera);
+    this.draw();
+  }
+
+  /** Applies renderer-level environment settings and draws one frame. */
+  private draw() {
+    const env = this.atmo.env;
+    this.renderer.toneMappingExposure = env.exposure;
+    this.scene.environmentIntensity = env.envLight;
+    if (env.bloom > 0.01) {
+      this.bloom.strength = env.bloom;
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
+  lightCount() {
+    let n = 0;
+    for (const l of this.live.values()) l.root.traverse((o) => { if ((o as THREE.Light).isLight) n++; });
+    return n;
   }
 
   private glowOpacity() {
@@ -303,6 +341,7 @@ export class WorldView {
     const el = this.canvas.parentElement ?? this.canvas;
     const w = el.clientWidth || 960, h = el.clientHeight || 540;
     this.renderer.setSize(w, h, false);
+    this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -330,7 +369,7 @@ export class WorldView {
     this.updateEntities(dt);
     this.atmo.update(dt, this.avatar.position, this.glowOpacity());
     this.updateCamera(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.draw();
   }
 
   private walk(dt: number) {

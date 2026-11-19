@@ -25,8 +25,11 @@ function mulberry32(seed) {
   };
 }
 
-/** Deterministic helpers handed to build/update. Seeded by entity id. */
-export function makeCtx(THREE, seedKey) {
+/**
+ * Deterministic helpers handed to build/update. Seeded by entity id.
+ * `lib` carries three.js addons: { mergeGeometries, ImprovedNoise, SimplexNoise }.
+ */
+export function makeCtx(THREE, seedKey, lib = {}) {
   const rng = mulberry32(hashString(String(seedKey)));
   const lattice = (ix, iz) => {
     const h = hashString(ix + ',' + iz + ':' + seedKey);
@@ -34,6 +37,7 @@ export function makeCtx(THREE, seedKey) {
   };
   const smooth = (t) => t * t * (3 - 2 * t);
   return {
+    lib,
     rng,
     range: (a, b) => a + (b - a) * rng(),
     pick: (arr) => arr[Math.floor(rng() * arr.length)],
@@ -44,6 +48,10 @@ export function makeCtx(THREE, seedKey) {
       const a = lattice(ix, iz), b = lattice(ix + 1, iz);
       const c = lattice(ix, iz + 1), d = lattice(ix + 1, iz + 1);
       return a + (b - a) * fx + (c - a) * fz + (a - b - c + d) * fx * fz;
+    },
+    /** Smooth physically based material (for realism: roughness, metalness, normal-ish detail via geometry). */
+    pbr(color, opts = {}) {
+      return new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0, ...opts });
     },
     /** Flat-shaded standard material. */
     mat(color, opts = {}) {

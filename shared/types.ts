@@ -59,6 +59,11 @@ export interface Environment {
   sunIntensity: number;
   sunDirection: Vec3; // direction the light comes FROM
   particles: number; // 0..1 floating dust density
+  // Realism controls (added for world-04; older runs fall back to the defaults).
+  exposure: number; // tone-mapping exposure, ~0.5-2
+  bloom: number; // 0 = off, ~0.2-1.5 glow on bright things
+  envLight: number; // 0..2 image-based ambient/reflection light
+  skyMode: 'gradient' | 'physical'; // physical = atmospheric scattering sky driven by sunDirection
 }
 
 export interface Avatar {
@@ -164,6 +169,19 @@ export interface DesignerEvent {
   ts: string;
 }
 
+/** A periodic whole-run review with direction for each agent. */
+export interface ReviewerEvent {
+  turn: number;
+  type: 'reviewer';
+  assessment: string;
+  narrative: string;
+  visual: string;
+  builder: string;
+  wanderer: string;
+  experience: string;
+  ts: string;
+}
+
 /** Ladder runs: the world's size budget moved to a new tier. */
 export interface BudgetEvent {
   turn: number;
@@ -207,7 +225,7 @@ export interface SystemEvent {
 
 export type TimelineEvent =
   | PlayerEvent | NarratorEvent | BuilderEvent | RenderEvent | DesignerEvent | SystemEvent
-  | BudgetEvent | EngineerEvent | EngineEvent;
+  | BudgetEvent | EngineerEvent | EngineEvent | ReviewerEvent;
 
 export interface RunInfo {
   id: string;
@@ -218,7 +236,7 @@ export interface RunInfo {
   /** Designer + polish pass every N turns (0 = no designer). Absent = 0. */
   designEvery?: number;
   /** 'ladder' runs use swappable engines and a growing budget; absent = legacy three.js runtime. */
-  mode?: 'ladder';
+  mode?: 'ladder' | 'tiered';
   engine?: string;
   tier?: number;
   status: 'running' | 'complete' | 'failed' | 'stopped';

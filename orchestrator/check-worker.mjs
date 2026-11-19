@@ -3,6 +3,7 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import * as THREE from 'three';
 import { makeCtx, moduleUrl, countTriangles, countLights } from '../shared/component-api.js';
+import { COMPONENT_LIB } from '../shared/component-lib.js';
 
 const { code, instances } = workerData;
 const out = { error: null, instances: [] };
@@ -13,7 +14,7 @@ try {
   const list = instances.length ? instances : [{ id: '_probe', params: {} }];
   for (const inst of list) {
     try {
-      const ctx = makeCtx(THREE, inst.id);
+      const ctx = makeCtx(THREE, inst.id, COMPONENT_LIB);
       const obj = mod.build(THREE, inst.params ?? {}, ctx);
       if (!obj || !obj.isObject3D) throw new Error('build() must return a THREE.Object3D');
       if (typeof mod.update === 'function') {

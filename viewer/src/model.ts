@@ -2,7 +2,7 @@
 // reducer; ladder runs replay each engine's own frozen world.js, migrating the
 // world across every engine change.
 import { applyFacts, emptyWorld, worldFromEvents } from '../../shared/world';
-import { TIERS } from '../../shared/ladder';
+import { TIERS, THREE_TIERS, contentBytes } from '../../shared/ladder';
 import type { Fact, RunInfo, TimelineEvent } from '../../shared/types';
 
 interface WorldModule {
@@ -35,9 +35,13 @@ function load(base: string) {
 export async function snapshot(run: RunInfo, events: TimelineEvent[], count: number): Promise<Snapshot> {
   if (run.mode !== 'ladder') {
     const s = worldFromEvents(events, count);
+    let tier = 0;
+    for (let i = 0; i < count && i < events.length; i++) { const e = events[i]; if (e.type === 'budget') tier = e.tier; }
+    const tiered = run.mode === 'tiered';
     return {
-      engineUrl: 'legacy', engine: null, engineNotes: '', world: s, facts: s.facts,
-      entityFacts: (id) => s.entities[id]?.fact ?? null, tier: -1, limit: 0, bytes: null,
+      engineUrl: 'legacy', engine: tiered ? `three.js · tier ${tier + 1}` : null, engineNotes: '', world: s, facts: s.facts,
+      entityFacts: (id) => s.entities[id]?.fact ?? null,
+      tier: tiered ? tier : -1, limit: tiered ? THREE_TIERS[tier].bytes : 0, bytes: tiered ? contentBytes(s) : null,
     };
   }
   const story = emptyWorld();

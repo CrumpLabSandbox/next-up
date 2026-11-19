@@ -1,11 +1,24 @@
 // The three agents: what each one is shown and what it must return.
 import { readFileSync } from 'node:fs';
 import { callClaude, type Content } from './claude';
-import type { BuilderEvent, DesignerEvent, DesignSuggestion, FactChange, NarratorEvent, PlayerEvent, TimelineEvent, WorldState } from '../shared/types';
+import type { BuilderEvent, DesignerEvent, DesignSuggestion, FactChange, NarratorEvent, PlayerEvent, ReviewerEvent, TimelineEvent, WorldState } from '../shared/types';
 import { LIMITS } from '../shared/world';
 
 const prompt = (name: string) => readFileSync(new URL(`./prompts/${name}.md`, import.meta.url), 'utf8');
-const PROMPTS = { player: prompt('player'), narrator: prompt('narrator'), builder: prompt('builder'), designer: prompt('designer') };
+const PROMPTS = { player: prompt('player'), narrator: prompt('narrator'), builder: prompt('builder'), designer: prompt('designer'), reviewer: prompt('reviewer') };
+
+/**
+ * Per-turn context set by the run loop: the resource-limit summary (tiered runs)
+ * and the latest Reviewer notes, which every agent call picks up.
+ */
+export const turnContext: { limits: string; review: ReviewerEvent | null } = { limits: '', review: null };
+
+const reviewNote = (who: string, ...fields: (keyof ReviewerEvent)[]) => {
+  const r = turnContext.review;
+  if (!r) return '';
+  const text = fields.map((f) => String(r[f] ?? '')).filter(Boolean).join('\n');
+  return text ? `## Reviewer's direction for the ${who} (turn ${r.turn})\n${text}` : '';
+};
 
 const imageContent = (file: string | null): Content[] =>
   file ? [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: readFileSync(file).toString('base64') } }] : [];
@@ -78,8 +91,10 @@ const DESIGNER_SCHEMA = {
       },
     },
     styleGuide: { type: 'string' },
+    requestUnlock: { type: 'boolean' },
+    unlockReason: { type: 'string' },
   },
-  required: ['critique', 'suggestions', 'styleGuide'],
+  required: ['critique', 'suggestions', 'styleGuide', 'requestUnlock', 'unlockReason'],
   additionalProperties: false,
 };
 
@@ -120,7 +135,9 @@ function sceneSummary(state: WorldState, lastTriangles: number): string {
   return [
     `Wanderer: at ${fmtVec(state.avatar.at)}, facing ${r1(state.avatar.facing)}°`,
     `Environment: ${JSON.stringify(env)}`,
-    `Scene budget: ${ents.length} entities, ~${lastTriangles.toLocaleString()} / ${LIMITS.trianglesTotal.toLocaleString()} triangles at last render, max ${LIMITS.lightsTotal} lights.`,
+    turnContext.limits
+      ? `Resources (${ents.length} entities): ${turnContext.limits}`
+      : `Scene budget: ${ents.length} entities, ~${lastTriangles.toLocaleString()} / ${LIMITS.trianglesTotal.toLocaleString()} triangles at last render, max ${LIMITS.lightsTotal} lights.`,
     `\n## Components\n${compLines.join('\n\n') || '(none yet)'}`,
     `\n## Entities\n${ents.join('\n') || '(none yet)'}`,
   ].join('\n');
@@ -130,7 +147,8 @@ function sceneSummary(state: WorldState, lastTriangles: number): string {
 
 export async function runPlayer(model: string, turn: number, events: TimelineEvent[], shot: string | null) {
   const lastNarr = [...events].reverse().find((e): e is NarratorEvent => e.type === 'narrator');
-  const text = `Story so far:\n\n${story(events)}\n\n---\nTurn ${turn}. The Narrator's latest:\n"${lastNarr?.narration ?? ''}"\n\nThe picture shows your current view. What do you do?`;
+  const review = reviewNote('Wanderer', 'wanderer');
+  const text = `Story so far:\n\n${story(events)}\n\n---\n${review ? `${review}\n\n` : ''}Turn ${turn}. The Narrator's latest:\n"${lastNarr?.narration ?? ''}"\n\nThe picture shows your current view. What do you do?`;
   const { output } = await callClaude<{ thought: string; action: string }>({
     label: 'player', model, system: PROMPTS.player, schema: PLAYER_SCHEMA,
     content: [...imageContent(shot), { type: 'text', text }],
@@ -147,6 +165,7 @@ export async function runNarrator(model: string, turn: number, events: TimelineE
     `## Wanderer position\nat ${fmtVec(state.avatar.at)}, facing ${r1(state.avatar.facing)}° (0 = north)`,
     lastBuilds.length ? `## Builder's notes from last turn\n${lastBuilds.map((b) => b.notes).join('\n')}` : '',
     `## Story so far\n${story(events, 14) || '(nothing yet)'}`,
+    reviewNote('Narrator', 'narrative'),
   ];
   if (turn === 0) {
     parts.push(
@@ -189,6 +208,7 @@ export async function runBuilder(
     `## All established facts\n${factsList(state)}`,
     `## Current scene (before your ops)\n${sceneSummary(state, lastTriangles)}`,
     issues.length ? `## Issues from the last render (please fix)\n${issues.map((i) => `- ${i}`).join('\n')}` : '',
+    reviewNote('Builder', 'builder', 'experience'),
     `The picture is the Wanderer's current view before your changes.`,
     feedback ? `## Your previous attempt this turn had problems\n${feedback}\nSend the complete corrected list of ops for this turn (it replaces the previous attempt entirely).` : '',
   ];
@@ -216,13 +236,46 @@ export async function runDesigner(
     `## Established story facts (respect these)\n${factsList(state)}`,
     `## Current scene\n${sceneSummary(state, lastTriangles)}`,
     history ? `## Your recent critiques and what the Builder did\n${history}` : '',
+    reviewNote('Graphic Designer', 'visual', 'experience'),
   ];
-  const { output } = await callClaude<{ critique: string; suggestions: DesignSuggestion[]; styleGuide: string }>({
+  const { output } = await callClaude<{ critique: string; suggestions: DesignSuggestion[]; styleGuide: string; requestUnlock: boolean; unlockReason: string }>({
     label: 'designer', model, system: PROMPTS.designer, schema: DESIGNER_SCHEMA,
     content: [...imageContent(storyShot), ...imageContent(overviewShot), { type: 'text', text: parts.filter(Boolean).join('\n\n') }],
   });
   return {
     turn, type: 'designer', critique: output.critique,
-    suggestions: (output.suggestions ?? []).slice(0, 4), styleGuide: output.styleGuide || styleGuide, ts: new Date().toISOString(),
+    suggestions: (output.suggestions ?? []).slice(0, 4), styleGuide: output.styleGuide || styleGuide,
+    requestUnlock: !!output.requestUnlock, unlockReason: output.unlockReason ?? '', ts: new Date().toISOString(),
   };
+}
+
+const REVIEWER_SCHEMA = {
+  type: 'object',
+  properties: Object.fromEntries(['assessment', 'narrative', 'visual', 'builder', 'wanderer', 'experience'].map((k) => [k, { type: 'string' }])),
+  required: ['assessment', 'narrative', 'visual', 'builder', 'wanderer', 'experience'],
+  additionalProperties: false,
+};
+
+/** Whole-run review: full story, a contact sheet of views across time, recent agent output. */
+export async function runReviewer(
+  model: string, turn: number, maxTurns: number, events: TimelineEvent[], state: WorldState,
+  shots: { turn: number; file: string }[], styleGuide: string,
+): Promise<ReviewerEvent> {
+  const recent = (type: TimelineEvent['type'], n: number, f: (e: TimelineEvent) => string) => events.filter((e) => e.type === type).slice(-n).map(f).join('\n');
+  const parts = [
+    `Turn ${turn} of about ${maxTurns}. The pictures are a contact sheet of the story view at turns ${shots.map((s) => s.turn).join(', ')} (in order); the last is the overview of the whole scene now.`,
+    `## Full story so far\n${story(events)}`,
+    `## Established facts\n${factsList(state)}`,
+    `## Resources\n${turnContext.limits || '(fixed)'}`,
+    `## Designer's style guide\n${styleGuide || '(none)'}`,
+    `## Designer's recent critiques\n${recent('designer', 4, (e) => (e.type === 'designer' ? `[${e.turn}] ${e.critique}` : ''))}`,
+    `## Builder's recent notes\n${recent('builder', 6, (e) => (e.type === 'builder' ? `[${e.turn}${e.stage === 'polish' ? ' polish' : ''}] ${e.notes}` : ''))}`,
+    turnContext.review ? `## Your previous review (turn ${turnContext.review.turn})\n${turnContext.review.assessment}` : '',
+  ];
+  const { output } = await callClaude<Omit<ReviewerEvent, 'turn' | 'type' | 'ts'>>({
+    label: 'reviewer', model, system: PROMPTS.reviewer, schema: REVIEWER_SCHEMA,
+    content: [...shots.flatMap((s) => imageContent(s.file)), { type: 'text', text: parts.filter(Boolean).join('\n\n') }],
+    timeoutMs: 15 * 60_000,
+  });
+  return { turn, type: 'reviewer', ...output, ts: new Date().toISOString() };
 }

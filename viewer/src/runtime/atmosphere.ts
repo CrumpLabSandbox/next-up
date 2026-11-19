@@ -1,6 +1,7 @@
 // Sky dome, fog, lights and drifting dust, all driven by the world Environment.
 import * as THREE from 'three';
 import type { Environment } from '../../../shared/types';
+import { DEFAULT_ENV } from '../../../shared/world';
 
 const DUST = 700;
 const DUST_RANGE = 36;
@@ -11,6 +12,7 @@ export class Atmosphere {
   readonly hemi: THREE.HemisphereLight;
   readonly fog: THREE.FogExp2;
   private skyMat: THREE.ShaderMaterial;
+  private skyDome: THREE.Mesh;
   private dust: THREE.Points;
   private dustMat: THREE.PointsMaterial;
   private glow: THREE.Mesh;
@@ -18,24 +20,42 @@ export class Atmosphere {
   private target: Environment;
 
   constructor(env: Environment) {
-    this.cur = structuredClone(env);
-    this.target = structuredClone(env);
+    this.cur = { ...structuredClone(DEFAULT_ENV), ...structuredClone(env) };
+    this.target = structuredClone(this.cur);
 
     this.skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
       fog: false,
-      uniforms: { top: { value: new THREE.Color() }, bottom: { value: new THREE.Color() } },
+      uniforms: {
+        top: { value: new THREE.Color() }, bottom: { value: new THREE.Color() },
+        sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunColor: { value: new THREE.Color() }, physical: { value: 0 },
+      },
       vertexShader: `varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform vec3 top; uniform vec3 bottom; varying vec3 vDir;
-        void main() { float h = clamp(vDir.y * 1.4 + 0.25, 0.0, 1.0); gl_FragColor = vec4(mix(bottom, top, pow(h, 0.8)), 1.0);
-        #include <colorspace_fragment>
+      // 'physical' adds a sun disc, a forward-scattering glow and a bright horizon band.
+      fragmentShader: `uniform vec3 top; uniform vec3 bottom; uniform vec3 sunDir; uniform vec3 sunColor; uniform float physical; varying vec3 vDir;
+        void main() {
+          vec3 d = normalize(vDir);
+          float h = clamp(d.y * 1.4 + 0.25, 0.0, 1.0);
+          vec3 col = mix(bottom, top, pow(h, 0.8));
+          if (physical > 0.5) {
+            vec3 s = normalize(sunDir);
+            float c = max(dot(d, s), 0.0);
+            float horizon = exp(-abs(d.y) * 9.0);
+            col = mix(col, mix(bottom, sunColor, 0.35) * 1.15, horizon * 0.55);
+            col += sunColor * (pow(c, 9.0) * 0.22 + pow(c, 64.0) * 0.45);
+            col += sunColor * smoothstep(0.9993, 0.9997, c) * 1.6;
+          }
+          gl_FragColor = vec4(col, 1.0);
+          #include <colorspace_fragment>
         }`,
     });
     const sky = new THREE.Mesh(new THREE.SphereGeometry(900, 32, 16), this.skyMat);
     sky.renderOrder = -1;
     sky.frustumCulled = false;
+    this.skyDome = sky;
     this.group.add(sky);
+
 
     this.fog = new THREE.FogExp2('#000000', 0.03);
     this.hemi = new THREE.HemisphereLight('#ffffff', '#202020', 1);
@@ -78,9 +98,13 @@ export class Atmosphere {
   }
 
   setEnv(env: Environment, animate: boolean) {
-    this.target = structuredClone(env);
-    if (!animate) { this.cur = structuredClone(env); this.apply(); }
+    this.target = { ...structuredClone(DEFAULT_ENV), ...structuredClone(env) };
+    this.cur.skyMode = this.target.skyMode;
+    if (!animate) { this.cur = structuredClone(this.target); this.apply(); }
   }
+
+  /** Current (interpolated) environment, for renderer-level settings. */
+  get env(): Environment { return this.cur; }
 
   /** Called each frame; `focus` is the wanderer's position. */
   update(dt: number, focus: THREE.Vector3, glowOpacity: number) {
@@ -89,14 +113,14 @@ export class Atmosphere {
     for (const key of ['skyTop', 'skyBottom', 'fogColor', 'sunColor'] as const) {
       c[key] = '#' + new THREE.Color(c[key]).lerp(new THREE.Color(t[key]), k).getHexString();
     }
-    for (const key of ['fogDensity', 'ambient', 'sunIntensity', 'particles'] as const) c[key] += (t[key] - c[key]) * k;
+    for (const key of ['fogDensity', 'ambient', 'sunIntensity', 'particles', 'exposure', 'bloom', 'envLight'] as const) c[key] += (t[key] - c[key]) * k;
     for (let i = 0; i < 3; i++) c.sunDirection[i] += (t.sunDirection[i] - c.sunDirection[i]) * k;
     this.apply();
 
     const dir = new THREE.Vector3(...c.sunDirection).normalize();
     this.sun.position.copy(focus).addScaledVector(dir, 80);
     this.sun.target.position.copy(focus);
-    this.group.children[0].position.copy(focus);
+    this.skyDome.position.copy(focus);
 
     const p = this.dust.geometry.attributes.position as THREE.BufferAttribute;
     const arr = p.array as Float32Array;
@@ -125,6 +149,10 @@ export class Atmosphere {
     this.hemi.intensity = c.ambient * 2.2;
     this.sun.color.set(c.sunColor);
     this.sun.intensity = c.sunIntensity * 2.6;
+    const u = this.skyMat.uniforms;
+    u.physical.value = c.skyMode === 'physical' ? 1 : 0;
+    u.sunDir.value.set(...c.sunDirection);
+    u.sunColor.value.set(c.sunColor);
     this.dustMat.opacity = c.particles * 0.7;
     this.dust.visible = c.particles > 0.01;
   }

@@ -24,6 +24,10 @@ export const DEFAULT_ENV: Environment = {
   sunIntensity: 0.6,
   sunDirection: [0.4, 1, 0.3],
   particles: 0.6,
+  exposure: 1,
+  bloom: 0,
+  envLight: 0,
+  skyMode: 'gradient',
 };
 
 export const PHASES = ['player', 'narrator', 'builder', 'render'] as const;
@@ -167,13 +171,20 @@ export function applyOp(s: WorldState, raw: unknown, turn: number): string | nul
           if (typeof op[k] !== 'string' || !COLOR_RE.test(op[k] as string)) throw new Error(`${k} must be #rrggbb`);
           env[k] = op[k] as string;
         }
-        for (const k of ['fogDensity', 'ambient', 'sunIntensity', 'particles'] as const) {
+        if (op.skyMode !== undefined) {
+          if (op.skyMode !== 'gradient' && op.skyMode !== 'physical') throw new Error("skyMode must be 'gradient' or 'physical'");
+          env.skyMode = op.skyMode;
+        }
+        for (const k of ['fogDensity', 'ambient', 'sunIntensity', 'particles', 'exposure', 'bloom', 'envLight'] as const) {
           if (op[k] === undefined) continue;
           if (!isNum(op[k])) throw new Error(`${k} must be a number`);
           env[k] = Math.max(0, op[k] as number);
         }
         env.fogDensity = Math.min(env.fogDensity, 0.2);
         env.particles = Math.min(env.particles, 1);
+        env.exposure = Math.min(Math.max(env.exposure, 0.1), 4);
+        env.bloom = Math.min(env.bloom, 3);
+        env.envLight = Math.min(env.envLight, 3);
         if (op.sunDirection !== undefined) {
           if (!isVec3(op.sunDirection)) throw new Error('sunDirection must be [x, y, z]');
           env.sunDirection = op.sunDirection;
