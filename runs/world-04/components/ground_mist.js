@@ -1,0 +1,3 @@
+// Faint drifting mist plane. params w,h,color,opacity
+export function build(T,p,c){const W=p.w||600,H=p.h||6;const t=c.dataTexture(128,32,(u,v)=>{const a=Math.max(0,1-Math.abs(v-.5)*2),n=.6+.4*Math.sin(u*6.2832*5)*Math.sin(u*6.2832*3+1);const k=255*a*a*n;return[k,k,k]});t.wrapS=T.RepeatWrapping;t.repeat.set(4,1);const m=new T.MeshBasicMaterial({color:p.color||'#3a4a7a',alphaMap:t,transparent:true,opacity:p.opacity||.12,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide});const g=new T.Group();g.add(new T.Mesh(new T.PlaneGeometry(W,H),m));g.userData={t};return g}
+export function update(o,t){o.userData.t.offset.x=(t*.3/150)%1}

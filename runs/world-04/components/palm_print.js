@@ -1,0 +1,2 @@
+// Small four-fingered palm print pressed in glaze
+export function build(T,p,c){const g=new T.Group(),m=new T.MeshBasicMaterial({color:'#05070f',transparent:true,opacity:.85,depthWrite:false});const a=(G,x,z,r)=>{const o=new T.Mesh(G,m);o.rotation.x=-Math.PI/2;o.position.set(x,0,z);o.rotation.z=r||0;g.add(o)};a(new T.CircleGeometry(.035,12),0,.03);[[-.03,-.03,.2],[-.01,-.045,.05],[.012,-.047,-.05],[.032,-.036,-.2]].map(f=>{const o=new T.Mesh(new T.PlaneGeometry(.012,.04),m);o.rotation.x=-Math.PI/2;o.position.set(f[0],0,f[1]+.0);o.rotation.z=f[2];g.add(o)});return g}
