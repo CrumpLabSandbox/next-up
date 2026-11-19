@@ -1,30 +1,35 @@
-// Glowing road of pale light running north (-Z) from origin, brighter toward the far end, fading in from 0 at the near 2 m, feathered 4 m glow strip, centre line, 6 pairs of edge dots and rising round motes; params: length, width, endWidth, rise
+// Glowing road of pale light running north (-Z); params: length, width, endWidth, rise, glow (strip width m), glowOpacity, dimNear (m), warm (m of gold fade at far end)
 export function build(THREE, p, ctx) {
   const g = new THREE.Group();
   const L = p.length || 25, W0 = p.width || 2.2, W1 = p.endWidth || 1.2, R = p.rise || 0;
+  const GW = p.glow || 4, GO = p.glowOpacity || 0.3, warm = p.warm || 0;
   const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   const wAt = (f) => W0 + (W1 - W0) * f;
-  const nf = 2 / L;
+  const nf = (p.dimNear || 2) / L;
   const tex = ctx.dataTexture(16, 64, (u, v) => { const e = Math.min(1, (1 - Math.abs(u * 2 - 1)) / 0.35); const k = e * sm(0, nf, v) * (0.55 + 0.45 * v) * (1 - sm(0.97, 1, v)) * 255; return [k * 0.85, k * 0.93, k]; });
   const gtex = ctx.dataTexture(16, 64, (u, v) => { const e = Math.pow(Math.max(0, 1 - Math.abs(u * 2 - 1)), 1.5); const k = e * sm(0, nf, v) * (0.5 + 0.5 * v) * (1 - sm(0.95, 1, v)) * 255; return [k, k, k]; });
+  const gold = new THREE.Color('#ffd37a');
   const strip = (wf, map, color, op, y) => {
-    const N = 20, pos = [], uv = [], idx = [];
+    const N = 20, pos = [], uv = [], idx = [], col = [];
+    const base = new THREE.Color(color);
     for (let i = 0; i <= N; i++) {
       const f = i / N;
-      [-1, 1].forEach((s, j) => { pos.push(s * wf(f) / 2, R * f + y, -f * L); uv.push(j, f); });
+      const c = warm ? base.clone().lerp(gold, sm(1 - warm / L, 1, f)) : base;
+      [-1, 1].forEach((s, j) => { pos.push(s * wf(f) / 2, R * f + y, -f * L); uv.push(j, f); col.push(c.r, c.g, c.b); });
       if (i < N) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     geo.setIndex(idx);
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: map, color: color, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: map, color: '#ffffff', vertexColors: true, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     g.add(m);
     return m;
   };
-  strip(() => 4, gtex, '#8fc0ff', 0.3, -0.02);
-  const rib = strip(wAt, tex, '#dfe6ff', 0.85, 0);
-  strip(() => 0.07, tex, '#dfe6ff', 0.5, 0.02);
+  strip(() => GW, gtex, '#8fc0ff', GO, -0.02);
+  const rib = strip(wAt, tex, p.warm ? '#dfe6ff' : '#dfe6ff', 0.85, 0);
+  strip(() => (p.warm ? 0.12 : 0.07), tex, '#eaf4ff', p.warm ? 0.8 : 0.5, 0.02);
   const dotGeo = new THREE.SphereGeometry(0.06, 6, 4);
   const dots = new THREE.InstancedMesh(dotGeo, new THREE.MeshBasicMaterial({ color: '#dfe6ff', fog: false }), 12);
   const d0 = new THREE.Object3D();
