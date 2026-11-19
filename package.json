@@ -1,0 +1,22 @@
+{
+  "name": "next-up",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "viewer": "vite --config viewer/vite.config.ts",
+    "world": "tsx orchestrator/run.ts",
+    "typecheck": "tsc --noEmit",
+    "selftest": "tsx orchestrator/selftest.ts"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
+    "playwright": "^1.65.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}

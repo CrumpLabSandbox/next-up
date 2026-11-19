@@ -1,0 +1,10 @@
+{
+  "id": "test-3",
+  "created": "2026-11-19T15:23:43.275Z",
+  "premise": "",
+  "model": "sonnet",
+  "maxTurns": 3,
+  "status": "complete",
+  "turnsCompleted": 3,
+  "calls": 11
+}

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>next-up</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>next&#8209;up</h1>
+        <select id="run" title="Run"></select>
+        <span id="premise"></span>
+        <span id="status"></span>
+      </header>
+      <main>
+        <section id="stage">
+          <canvas id="c"></canvas>
+          <div id="modes" role="group" aria-label="Camera">
+            <button data-mode="follow" class="on" title="Camera follows the wanderer (F)">Follow</button>
+            <button data-mode="orbit" title="Orbit around the wanderer (O)">Orbit</button>
+            <button data-mode="walk" title="Walk freely (K)">Walk</button>
+          </div>
+          <div id="walkhelp" hidden>WASD / arrows move · Shift runs · drag to look · Esc returns to the story</div>
+          <div id="caption"></div>
+          <div id="tip" hidden></div>
+          <div id="empty" hidden>No runs yet. Start one with <code>npm run world</code>.</div>
+        </section>
+        <aside id="feed"></aside>
+      </main>
+      <footer id="timeline">
+        <button id="first" title="Start">&#9198;</button>
+        <button id="back" title="Step back">&#9664;</button>
+        <button id="play" title="Play / pause (space)">&#9654;</button>
+        <button id="fwd" title="Step forward">&#9654;&#9654;</button>
+        <button id="last" title="End">&#9197;</button>
+        <div id="scrub">
+          <input id="pos" type="range" min="0" max="0" value="0" />
+          <div id="ticks"></div>
+          <img id="thumb" alt="" hidden />
+        </div>
+        <span id="turnlabel">–</span>
+        <select id="speed" title="Speed">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+        </select>
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
