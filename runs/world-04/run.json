@@ -6,8 +6,8 @@
   "maxTurns": 50,
   "designEvery": 1,
   "status": "running",
-  "turnsCompleted": 32,
-  "calls": 184,
+  "turnsCompleted": 42,
+  "calls": 236,
   "mode": "tiered",
   "tier": 4
 }
