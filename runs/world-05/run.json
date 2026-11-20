@@ -1,0 +1,14 @@
+{
+  "id": "world-05",
+  "created": "2026-11-20T11:53:46.354Z",
+  "premise": "The Wanderer wakes in a dark room.",
+  "model": "sonnet",
+  "maxTurns": 10,
+  "designEvery": 1,
+  "status": "running",
+  "turnsCompleted": 0,
+  "calls": 0,
+  "mode": "tiered",
+  "tier": 0,
+  "human": true
+}
