@@ -1,0 +1,3 @@
+// glowing amber handprint on ground; params: size (m)
+export function build(THREE,p,ctx){const s=p.size||.2,g=new THREE.Group(),m=new THREE.MeshBasicMaterial({color:'#ffa83a',blending:THREE.AdditiveBlending,transparent:true,opacity:.9,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,toneMapped:false});[[0,0,.5,.55,0],[-.22,.45,.13,.4,.2],[-.08,.55,.13,.46,.05],[.07,.55,.13,.46,-.05],[.21,.45,.12,.38,-.2],[.33,.05,.14,.36,-1]].forEach(f=>{const e=new THREE.Mesh(new THREE.CircleGeometry(.5,16),m);e.scale.set(f[2]*s,f[3]*s,1);e.position.set(f[0]*s,f[1]*s,0);e.rotation.z=f[4];g.add(e)});g.rotation.x=-Math.PI/2;g.position.y=.015;g.userData.m=m;return g}
+export function update(o,t){o.userData.m.opacity=.65+.3*Math.sin(t*3.2)}

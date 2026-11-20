@@ -17,6 +17,7 @@ export class Stage {
   private mode = 'follow';
   private chain: Promise<void> = Promise.resolve();
   private queued: { url: string; world: unknown; animate: boolean } | null = null;
+  private cutDone: (() => void) | null = null;
   modes: string[] = ['follow'];
   onKey: (key: string) => void = () => {};
   onHover: (hit: { id: string; fact: string | null } | null, x: number, y: number) => void = () => {};
@@ -37,6 +38,7 @@ export class Stage {
       } else if (frame === this.current) {
         if (m.event === 'key') this.onKey(m.key);
         if (m.event === 'hover') this.onHover(m.hit, m.x, m.y);
+        if (m.event === 'cutsceneEnd') { const r = this.cutDone; this.cutDone = null; r?.(); }
       }
     });
   }
@@ -113,6 +115,24 @@ export class Stage {
       };
       if (animate) setTimeout(drop, FADE_MS); else drop();
     }
+  }
+
+  /** Plays a cutscene on the current engine; resolves when it ends or is stopped. */
+  async playCutscene(cs: unknown): Promise<void> {
+    await this.chain;
+    const f = this.current;
+    if (!f) return;
+    this.stopCutscene();
+    const done = new Promise<void>((r) => (this.cutDone = r));
+    await this.call(f, 'playCutscene', cs).catch(() => this.cutDone?.());
+    return done;
+  }
+
+  stopCutscene() {
+    if (this.current) this.call(this.current, 'stopCutscene').catch(() => {});
+    const r = this.cutDone;
+    this.cutDone = null;
+    r?.();
   }
 
   setMode(mode: string) {

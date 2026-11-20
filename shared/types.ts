@@ -124,6 +124,7 @@ export interface NarratorEvent {
   narration: string;
   movement: string;
   facts: FactChange[];
+  human?: boolean; // a person played the Narrator this turn
   ts: string;
 }
 
@@ -168,6 +169,49 @@ export interface DesignerEvent {
   requestUnlock?: boolean;
   unlockReason?: string;
   engineRequest?: string;
+  human?: boolean; // a person played the Designer this turn
+  ts: string;
+}
+
+/** Roles a person can play: always the Wanderer, and rarely (as an unlock) another agent. */
+export type HumanRole = 'wanderer' | 'narrator' | 'designer' | 'gamemaster';
+
+export interface Roll {
+  dice: number[]; // the seeded dice actually rolled
+  modifier: number;
+  total: number;
+  band: 'hit' | 'partial' | 'miss';
+  visible: boolean; // shown to the audience?
+  presentation: string; // how it is shown: "dice", "a tossed coin", "the tarot", "an omen in the stars", …
+  reason: string; // what was at stake
+}
+
+/** The Game Master's ruling on a move, plus game-state changes. */
+export interface GameMasterEvent {
+  turn: number;
+  type: 'gamemaster';
+  ruling: string; // for the Narrator: what happened mechanically
+  announce: string; // one line for the audience
+  roll: Roll | null;
+  ops: import('./game').GameOp[];
+  rejected: { op: unknown; error: string }[];
+  pacing: 'build' | 'peak' | 'relax';
+  grantRole?: { role: HumanRole; forTurn: number; reason: string } | null;
+  breakthrough?: string | null; // nomination for this turn's cutscene
+  human?: boolean; // a person played the Game Master this turn
+  ts: string;
+}
+
+/** A short film linking this turn to the next. */
+export interface CutsceneEvent {
+  turn: number;
+  type: 'cutscene';
+  cutscene: import('./cutscene').Cutscene;
+  tier: number; // effective cutscene tier (breakthroughs go higher)
+  breakthrough: string | null;
+  notes: string;
+  stills: string[];
+  problems: string[];
   ts: string;
 }
 
@@ -181,6 +225,7 @@ export interface ReviewerEvent {
   builder: string;
   wanderer: string;
   experience: string;
+  breakthrough?: string; // optional nomination for the next cutscene
   ts: string;
 }
 
@@ -227,7 +272,7 @@ export interface SystemEvent {
 
 export type TimelineEvent =
   | PlayerEvent | NarratorEvent | BuilderEvent | RenderEvent | DesignerEvent | SystemEvent
-  | BudgetEvent | EngineerEvent | EngineEvent | ReviewerEvent;
+  | BudgetEvent | EngineerEvent | EngineEvent | ReviewerEvent | GameMasterEvent | CutsceneEvent;
 
 export interface RunInfo {
   id: string;
@@ -248,5 +293,7 @@ export interface RunInfo {
   /** Human Wanderer mode: a person types the Wanderer's moves. */
   human?: boolean;
   /** Set while the run is waiting for the person's move. */
-  awaiting?: { turn: number; since: string } | null;
+  awaiting?: { turn: number; since: string; role?: HumanRole; prompt?: string } | null;
+  /** Game Master runs: a GM rules each move, and a cutscene follows each turn. */
+  gameMaster?: boolean;
 }

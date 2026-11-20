@@ -1,9 +1,12 @@
 import { WorldView } from './runtime/world-view';
 import { Feed } from './ui/feed';
 import { Stage } from './stage';
+import { Hud } from './ui/hud';
+import { gameFromEvents } from '../../shared/game';
 import { snapshot, type Snapshot } from './model';
 import { TIERS, THREE_TIERS, fmtBytes, fmtTier } from '../../shared/ladder';
 import type { RunInfo, TimelineEvent, WorldState } from '../../shared/types';
+import type { Cutscene } from '../../shared/cutscene';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 const params = new URLSearchParams(location.search);
@@ -20,6 +23,11 @@ if (params.has('capture')) {
       view.renderStill(which);
       return { errors: view.drainErrors(), triangles: view.triangleCount(), lights: view.lightCount() };
     },
+    async renderCutscene(state: WorldState, cs: Cutscene, t: number) {
+      await view.setState(state, false);
+      await view.renderCutsceneStill(cs, t);
+      return { errors: view.drainErrors() };
+    },
   };
   (window as unknown as Record<string, unknown>).__nextupReady = true;
 } else {
@@ -34,6 +42,28 @@ function startViewer() {
   const caption = $('#caption');
   const tip = $('#tip');
   const thumb = $<HTMLImageElement>('#thumb');
+  const hud = new Hud($('#hud'));
+  const toast = $('#toast');
+  const skipBtn = $<HTMLButtonElement>('#skipcut');
+  const cutsBox = $<HTMLInputElement>('#cuts');
+  try { cutsBox.checked = localStorage.getItem('nextup.cutscenes') !== 'off'; } catch { /* storage unavailable */ }
+  cutsBox.onchange = () => { try { localStorage.setItem('nextup.cutscenes', cutsBox.checked ? 'on' : 'off'); } catch { /* ignore */ } };
+  let cutPlaying = false;
+  let toastTimer: number | undefined;
+  function showToast(html: string, ms = 3800) {
+    toast.innerHTML = html;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => (toast.hidden = true), ms);
+  }
+  async function playCut(cs: unknown) {
+    cutPlaying = true;
+    skipBtn.hidden = false;
+    await stage.playCutscene(cs);
+    skipBtn.hidden = true;
+    cutPlaying = false;
+  }
+  skipBtn.onclick = () => stage.stopCutscene();
 
   let run: RunInfo | null = null;
   let events: TimelineEvent[] = [];
@@ -75,6 +105,8 @@ function startViewer() {
     $('#premise').textContent = info.premise;
     $('#ladder').hidden = info.mode !== 'ladder' && info.mode !== 'tiered';
     feed.clear();
+    hud.reset();
+    $('#cutopt').hidden = !info.gameMaster;
     await seek(0, false);
     updateStatus();
     renderTicks();
@@ -110,7 +142,11 @@ function startViewer() {
     if (waiting !== sayTurn) {
       sayTurn = waiting;
       say.hidden = waiting < 0;
-      $('#say-turn').textContent = `turn ${waiting}`;
+      const role = run?.awaiting?.role ?? 'wanderer';
+      const roleName = { wanderer: 'Your move', narrator: 'You are the Narrator', designer: 'You are the Graphic Designer', gamemaster: 'You are the Game Master' }[role];
+      $('.say-head').innerHTML = `${roleName} · <span id="say-turn">turn ${waiting}</span>`;
+      $<HTMLTextAreaElement>('#say-action').placeholder = run?.awaiting?.prompt ?? 'What do you do, say or ask?';
+      $<HTMLInputElement>('#say-thought').hidden = role !== 'wanderer';
       $('#say-status').textContent = '';
       say.querySelector('button')!.disabled = false;
       if (waiting >= 0) $<HTMLTextAreaElement>('#say-action').focus();
@@ -124,7 +160,7 @@ function startViewer() {
     $('#say-status').textContent = 'sending…';
     const res = await fetch('api/input', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ run: run.id, turn: sayTurn, action, thought: $<HTMLInputElement>('#say-thought').value }),
+      body: JSON.stringify({ run: run.id, turn: sayTurn, role: run.awaiting?.role ?? 'wanderer', action, thought: $<HTMLInputElement>('#say-thought').value }),
     }).catch(() => null);
     if (res?.ok) {
       $<HTMLTextAreaElement>('#say-action').value = '';
@@ -177,6 +213,7 @@ function startViewer() {
 
   async function seek(c: number, animate: boolean) {
     c = Math.max(0, Math.min(events.length, c));
+    if (cutPlaying) stage.stopCutscene();
     // Render events carry no world change; reveal them with the step before.
     while (c < events.length && c > 0 && events[c].type === 'render') c++;
     cursor = c;
@@ -186,6 +223,7 @@ function startViewer() {
     const narr = [...events.slice(0, cursor)].reverse().find((e) => e.type === 'narrator');
     caption.textContent = narr && narr.type === 'narrator' ? narr.narration : '';
     if (!run) return;
+    if (run.gameMaster) hud.render(gameFromEvents(events, cursor), animate);
     const token = ++seekToken;
     const s = await snapshot(run, events, cursor);
     if (token !== seekToken) return;
@@ -201,6 +239,8 @@ function startViewer() {
       : ev.type === 'builder' ? 3000
       : ev.type === 'designer' ? Math.min(8000, 2500 + ev.critique.length * 15)
       : ev.type === 'engineer' ? 4500
+      : ev.type === 'gamemaster' ? 3800
+      : ev.type === 'cutscene' ? 700
       : ev.type === 'reviewer' ? Math.min(10000, 3000 + ev.assessment.length * 15)
       : ev.type === 'engine' ? 4000
       : ev.type === 'budget' ? 2500
@@ -214,7 +254,13 @@ function startViewer() {
       return;
     }
     await seek(cursor + 1, true);
-    if (playing) timer = window.setTimeout(step, delayFor(events[cursor - 1]));
+    const ev = events[cursor - 1];
+    if (ev?.type === 'gamemaster' && (ev.announce || ev.roll?.visible)) {
+      const r = ev.roll;
+      showToast(`${ev.announce}${r?.visible ? `<span class="roll">${r.presentation || 'dice'}: ${r.dice.join(' + ')}${r.modifier ? ` ${r.modifier > 0 ? '+' : '−'} ${Math.abs(r.modifier)}` : ''} = ${r.total} · ${r.band === 'hit' ? 'success' : r.band === 'partial' ? 'success at a cost' : 'miss'}</span>` : ''}`);
+    }
+    if (ev?.type === 'cutscene' && cutsBox.checked && playing) await playCut(ev.cutscene);
+    if (playing) timer = window.setTimeout(step, delayFor(ev));
   }
 
   function play() {
@@ -231,6 +277,14 @@ function startViewer() {
     playBtn.innerHTML = '&#9654;';
   }
 
+  feed.onPlayCutscene = async (turn) => {
+    pause();
+    const i = events.findIndex((e) => e.type === 'cutscene' && e.turn === turn);
+    if (i < 0) return;
+    await seek(i + 1, false);
+    const ev = events[i];
+    if (ev.type === 'cutscene') await playCut(ev.cutscene);
+  };
   feed.onSeekTurn = (t) => {
     pause();
     const i = events.findIndex((e) => e.turn > t);

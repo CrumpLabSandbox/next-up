@@ -18,5 +18,6 @@ if (!info.awaiting) {
 }
 const turn = info.awaiting.turn;
 fs.mkdirSync(path.join(dir, 'input'), { recursive: true });
-fs.writeFileSync(path.join(dir, 'input', `turn-${String(turn).padStart(3, '0')}.json`), JSON.stringify({ action, thought, via: 'terminal' }));
-console.log(`sent turn ${turn}: ${action}`);
+const role = info.awaiting.role ?? 'wanderer';
+fs.writeFileSync(path.join(dir, 'input', `turn-${String(turn).padStart(3, '0')}-${role}.json`), JSON.stringify({ action, thought, via: 'terminal' }));
+console.log(`sent turn ${turn} (as ${role}): ${action}`);

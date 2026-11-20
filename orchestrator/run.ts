@@ -3,8 +3,10 @@
 // render → every few turns a Reviewer looks at the whole run. Every step is appended to
 // runs/<id>/timeline.jsonl.
 //
-//   npm run world -- --turns 50 [--premise "..."] [--model sonnet] [--id name]
-//                    [--reviewer-every 5] [--reviewer-model fable] [--no-tiers] [--human]
+//   npm run world -- [--turns 20] [--premise "..."] [--model sonnet] [--id name]
+//                    [--reviewer-every 5] [--reviewer-model fable] [--no-tiers] [--human] [--no-game-master]
+//   Game Master runs (the default): a Game Master rules each move with an open set of mechanics
+//   and a HUD, and a Cutscene Director films a cutscene after every turn.
 //   --human: you are the Wanderer. Each turn waits for runs/<id>/input/turn-NNN.json, written
 //   by the viewer's input box or `npm run say -- <id> "what you do"`.
 //   npm run world -- --resume <id> [--turns 50]
@@ -15,17 +17,20 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { runBuilder, runDesigner, runNarrator, runPlayer, runReviewer, turnContext, type BuilderBrief } from './agents';
+import { runCutsceneDirector, runGameMaster } from './gm-agents';
+import { applyGameOp, describeGame, gameFromEvents } from '../shared/game';
+import { CUTSCENE_TIERS, validateCutscene, type Cutscene } from '../shared/cutscene';
 import { Capture } from './capture';
 import { checkWorld } from './check';
 import { applyEvent, applyOp, cloneWorld, emptyWorld, LIMITS, worldFromEvents } from '../shared/world';
 import { LADDER, THREE_TIERS, THREE_UNLOCK_GAP, contentBytes, fmtBytes, fmtTier } from '../shared/ladder';
-import type { BuilderEvent, DesignerEvent, Op, PlayerEvent, RenderEvent, ReviewerEvent, RunInfo, TimelineEvent, WorldState } from '../shared/types';
+import type { BuilderEvent, CutsceneEvent, DesignerEvent, GameMasterEvent, HumanRole, Op, PlayerEvent, RenderEvent, ReviewerEvent, Roll, RunInfo, TimelineEvent, WorldState } from '../shared/types';
 
 const RUNS = fileURLToPath(new URL('../runs/', import.meta.url));
 
 const { values: args } = parseArgs({
   options: {
-    turns: { type: 'string', default: '50' },
+    turns: { type: 'string', default: '20' },
     premise: { type: 'string', default: '' },
     model: { type: 'string', default: 'sonnet' },
     id: { type: 'string' },
@@ -35,6 +40,7 @@ const { values: args } = parseArgs({
     'reviewer-model': { type: 'string', default: 'fable' },
     'no-tiers': { type: 'boolean', default: false },
     human: { type: 'boolean', default: false },
+    'no-game-master': { type: 'boolean', default: false },
   },
 });
 
@@ -68,7 +74,7 @@ if (args.resume) {
   events = all.filter((e) => e.turn <= lastDone);
   writeFileSync(join(dir, 'timeline.jsonl'), events.map((e) => JSON.stringify(e) + '\n').join(''));
   run.turnsCompleted = Math.max(0, lastDone);
-  if (args.turns) run.maxTurns = Number(args.turns);
+  if (process.argv.some((a) => a === '--turns' || a.startsWith('--turns='))) run.maxTurns = Number(args.turns);
   console.log(`Resuming ${run.id} after turn ${lastDone}`);
 } else {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);
@@ -80,6 +86,7 @@ if (args.resume) {
     designEvery: Number(args['design-every']), status: 'running', turnsCompleted: 0, calls: 0,
     ...(args['no-tiers'] ? {} : { mode: 'tiered' as const, tier: 0 }),
     ...(args.human ? { human: true } : {}),
+    ...(args['no-game-master'] ? {} : { gameMaster: true }),
   };
 }
 mkdirSync(join(dir, 'shots'), { recursive: true });
@@ -112,6 +119,38 @@ for (const e of events) {
 }
 const limits = () => THREE_TIERS[tier];
 
+// ---------- Game Master state ----------
+let game = gameFromEvents(events);
+let pendingRole: { role: HumanRole; forTurn: number } | null = null;
+let roleGrants = 0;
+let lastGrantTurn = -99;
+let breakthroughsUsed = 0;
+let reviewBreakthrough = '';
+for (const e of events) {
+  if (e.type === 'gamemaster' && e.grantRole) { roleGrants++; lastGrantTurn = e.turn; pendingRole = { role: e.grantRole.role, forTurn: e.grantRole.forTurn }; }
+  if (e.type === 'cutscene' && e.breakthrough) breakthroughsUsed++;
+}
+const MAX_BREAKTHROUGHS = () => Math.max(2, Math.ceil(run.maxTurns / 8));
+const roleSwapAllowed = (turn: number) => run.human && roleGrants < Math.max(1, Math.floor(run.maxTurns / 10)) && turn - lastGrantTurn >= 6 && turn + 1 <= run.maxTurns;
+
+function hash32(s: string) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+/** Seeded per run and turn, so a resumed run rolls the same dice. */
+function seededRandom(key: string) {
+  let a = hash32(`${run.id}:${key}`);
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const diceFor = (turn: number) => { const r = seededRandom(`dice:${turn}`); return [1 + Math.floor(r() * 6), 1 + Math.floor(r() * 6)]; };
+
 /** The resource line every agent sees in tiered runs. */
 function limitsText(turn: number) {
   if (!tiered) return '';
@@ -124,26 +163,32 @@ function limitsText(turn: number) {
     (next ? `Next tier: ${fmtTier(next)}, ${wait <= 0 ? 'can be unlocked NOW if the Designer asks' : `unlockable in ${wait} turns`}.` : 'Top tier reached.');
 }
 
-/** Human Wanderer mode: wait for the person's move for this turn. */
-async function humanMove(turn: number): Promise<PlayerEvent> {
-  const file = join(dir, 'input', `turn-${pad(turn)}.json`);
+/** Waits for the person's input for this turn and role (viewer input box or `npm run say`). */
+async function humanInput(turn: number, role: HumanRole, prompt: string): Promise<{ text: string; thought: string }> {
+  const file = join(dir, 'input', `turn-${pad(turn)}-${role}.json`);
   mkdirSync(join(dir, 'input'), { recursive: true });
-  run.awaiting = { turn, since: now() };
+  run.awaiting = { turn, since: now(), role, prompt };
   saveRun();
-  console.log(`  waiting for your move (viewer input box, or: npm run say -- ${run.id} "...")`);
+  console.log(`  waiting for you as ${role} (viewer input box, or: npm run say -- ${run.id} "...")`);
   while (!existsSync(file)) {
-    if (existsSync(join(dir, 'STOP'))) throw new Error('stopped while waiting for the Wanderer');
+    if (existsSync(join(dir, 'STOP'))) throw new Error(`stopped while waiting for the ${role}`);
     await new Promise((r) => setTimeout(r, 1000));
   }
   const input = JSON.parse(readFileSync(file, 'utf8'));
   run.awaiting = null;
   saveRun();
-  return { turn, type: 'player', thought: String(input.thought ?? ''), action: String(input.action ?? '').trim() || 'look around', human: true, ts: now() };
+  return { text: String(input.action ?? '').trim(), thought: String(input.thought ?? '') };
+}
+
+async function humanMove(turn: number): Promise<PlayerEvent> {
+  const { text, thought } = await humanInput(turn, 'wanderer', 'What do you do, say or ask?');
+  return { turn, type: 'player', thought, action: text || 'look around', human: true, ts: now() };
 }
 
 function record(ev: TimelineEvent) {
   events.push(ev);
   applyEvent(state, ev);
+  if (ev.type === 'gamemaster') for (const op of ev.ops) applyGameOp(game, structuredClone(op), ev.turn);
   appendFileSync(join(dir, 'timeline.jsonl'), JSON.stringify(ev) + '\n');
 }
 
@@ -271,6 +316,96 @@ async function render(turn: number, final: boolean) {
   issues = ev.errors;
 }
 
+/** The Game Master rules on this turn's move (or formalizes the person's ruling on a role-swap turn). */
+async function gameMasterStep(turn: number, move: PlayerEvent, humanRuling: string | null) {
+  const dice = diceFor(turn);
+  const out = await runGameMaster(run.model, turn, run.maxTurns, events, state, move, dice, lastShot, !!roleSwapAllowed(turn), humanRuling);
+  run.calls++;
+  const trial = structuredClone(game);
+  const ops: GameMasterEvent['ops'] = [];
+  const rejected: GameMasterEvent['rejected'] = [];
+  for (const op of out.ops ?? []) {
+    const err = applyGameOp(trial, structuredClone(op), turn);
+    if (err) rejected.push({ op, error: err });
+    else ops.push(op as GameMasterEvent['ops'][number]);
+  }
+  let roll: Roll | null = null;
+  if (out.useRoll) {
+    const total = dice[0] + dice[1] + (Number.isFinite(out.modifier) ? out.modifier : 0);
+    roll = { dice, modifier: out.modifier || 0, total, band: total >= 10 ? 'hit' : total >= 7 ? 'partial' : 'miss', visible: !!out.visible, presentation: out.presentation || 'dice', reason: out.rollReason };
+  }
+  let grantRole: GameMasterEvent['grantRole'] = null;
+  if (out.grantRole && roleSwapAllowed(turn)) {
+    grantRole = { role: out.grantRole, forTurn: turn + 1, reason: out.grantReason };
+    pendingRole = { role: out.grantRole, forTurn: turn + 1 };
+    roleGrants++;
+    lastGrantTurn = turn;
+  }
+  const ev: GameMasterEvent = {
+    turn, type: 'gamemaster', ruling: out.ruling, announce: out.announce, roll, ops, rejected, pacing: out.pacing,
+    grantRole, breakthrough: out.breakthrough || null, ...(humanRuling ? { human: true } : {}), ts: now(),
+  };
+  record(ev);
+  turnContext.game = describeGame(game);
+  turnContext.ruling = `${ev.ruling}${roll ? `\n(Roll: ${roll.total}, ${roll.band === 'hit' ? 'full success' : roll.band === 'partial' ? 'success at a cost' : 'miss: fail forward'}${roll.visible ? `, shown to the audience as ${roll.presentation}` : ', hidden'}.)` : ''}`;
+  console.log(`  gm: ${ev.announce}${roll ? ` [${roll.presentation} ${roll.total} ${roll.band}${roll.visible ? '' : ' hidden'}]` : ''} · ${ev.pacing}${ops.length ? ` · ops ${ops.map((o) => `${o.op}:${o.id}`).join(', ')}` : ''}${rejected.length ? ` · rejected ${rejected.length}` : ''}${grantRole ? ` · ✧ grants ${grantRole.role}` : ''}`);
+  return ev;
+}
+
+/** A cutscene after every turn: validated against its tier, with stills rendered for the record. */
+async function cutsceneStep(turn: number, gm: GameMasterEvent | null) {
+  const rand = seededRandom(`breakthrough:${turn}`)();
+  const lastCut = [...events].reverse().find((e): e is CutsceneEvent => e.type === 'cutscene');
+  const canBreak = breakthroughsUsed < MAX_BREAKTHROUGHS() && !(lastCut?.breakthrough && lastCut.turn === turn - 1) && turn > 0;
+  const nominated = gm?.breakthrough || reviewBreakthrough || (rand < 0.1 ? 'A rare alignment: the world itself leans in to watch.' : '');
+  const breakthrough = canBreak && nominated ? nominated : null;
+  if (breakthrough) { breakthroughsUsed++; reviewBreakthrough = ''; }
+  const cutTier = Math.min(CUTSCENE_TIERS.length - 1, (tiered ? tier : 4) + (breakthrough ? 2 : 0));
+  const known = { entities: new Set(Object.keys(state.entities)), components: new Set(Object.keys(state.components)) };
+  const sceneText = [
+    `Wanderer at [${state.avatar.at.map((v) => Math.round(v * 10) / 10).join(', ')}], facing ${state.avatar.facing}° (0 = north = -Z)`,
+    `Environment: ${JSON.stringify(state.env)}`,
+    `Components: ${Object.values(state.components).map((c) => `${c.name} (${c.doc})`).join('; ')}`,
+    `Entities:\n${Object.values(state.entities).map((e) => `- ${e.id} · ${e.component} at [${e.at.map((v) => Math.round(v * 10) / 10).join(', ')}] rot ${e.rotation} scale ${e.scale}${e.fact ? ` · ${state.facts[e.fact]?.description.slice(0, 80) ?? e.fact}` : ''}`).join('\n')}`,
+  ].join('\n');
+  let feedback: string | null = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let out: { notes: string; cutscene: Cutscene };
+    try {
+      out = await runCutsceneDirector(run.model, turn, events, state, sceneText.slice(0, 40_000), lastShot, cutTier, breakthrough, feedback);
+      run.calls++;
+    } catch (err) {
+      console.warn(`  cutscene failed: ${(err as Error).message}`);
+      return;
+    }
+    const cs = out.cutscene;
+    const problems = validateCutscene(cs, cutTier, known);
+    const stills: string[] = [];
+    if (!problems.length) {
+      const times = [0.15, 0.5, 0.85].map((f) => Math.round(cs.duration * f * 10) / 10);
+      for (const [k, t] of times.entries()) {
+        const file = `shots/turn-${pad(turn)}-cut-${k + 1}.jpg`;
+        const res = await capture.renderCutscene(state, cs, t, join(dir, file));
+        problems.push(...res.errors.map((e) => `render at ${t}s: ${e}`));
+        stills.push(file);
+      }
+    }
+    if (!problems.length || attempt === 2) {
+      if (problems.length && !stills.length) {
+        record({ turn, type: 'system', message: `Cutscene skipped: ${problems.slice(0, 3).join('; ')}`, ts: now() });
+        console.log(`  cutscene skipped: ${problems.join('; ')}`);
+        return;
+      }
+      const ev: CutsceneEvent = { turn, type: 'cutscene', cutscene: cs, tier: cutTier, breakthrough, notes: out.notes, stills, problems, ts: now() };
+      record(ev);
+      console.log(`  cutscene${breakthrough ? ' ★ BREAKTHROUGH' : ''}: ${cs.duration}s, ${cs.shots.length} shots · ${out.notes}`);
+      return;
+    }
+    feedback = problems.map((p) => `- ${p}`).join('\n');
+    console.log(`  cutscene attempt ${attempt} problems:\n${feedback}`);
+  }
+}
+
 try {
   if (tiered && !events.length) {
     record({ turn: 0, type: 'budget', tier: 0, limit: THREE_TIERS[0].bytes, reason: `The world begins small: ${fmtTier(THREE_TIERS[0])}.`, ts: now() });
@@ -281,15 +416,28 @@ try {
   for (let turn = startTurn; turn <= run.maxTurns; turn++) {
     const t0 = Date.now();
     turnContext.limits = limitsText(turn);
-    console.log(`\n=== ${turn === 0 ? 'Genesis' : `Turn ${turn}`}${tiered ? ` · tier ${tier + 1}` : ''} ===`);
+    turnContext.game = run.gameMaster ? describeGame(game) : '';
+    turnContext.ruling = '';
+    turnContext.arc = `Turn ${turn} of a planned ${run.maxTurns}.`;
+    const swap = pendingRole?.forTurn === turn ? pendingRole.role : null;
+    if (swap) pendingRole = null;
+    console.log(`\n=== ${turn === 0 ? 'Genesis' : `Turn ${turn}`}${tiered ? ` · tier ${tier + 1}` : ''}${swap ? ` · you play the ${swap}` : ''} ===`);
+    let gm: GameMasterEvent | null = null;
     if (turn > 0) {
-      const p = run.human ? await humanMove(turn) : await runPlayer(run.model, turn, events, lastShot);
-      if (!run.human) run.calls++;
+      // On a role-swap turn an AI walks the Wanderer while the person plays another agent.
+      const p: PlayerEvent = run.human && !swap ? await humanMove(turn) : await runPlayer(run.model, turn, events, lastShot);
+      if (!p.human) run.calls++;
       record(p);
-      console.log(`  wanderer: ${p.action}`);
+      console.log(`  wanderer${p.human ? ' (you)' : ''}: ${p.action}`);
+      if (run.gameMaster) {
+        const humanRuling = swap === 'gamemaster' ? (await humanInput(turn, 'gamemaster', `You are the Game Master. The Wanderer: "${p.action}". Rule on it: what happens, any cost, roll or new mechanic?`)).text : null;
+        gm = await gameMasterStep(turn, p, humanRuling);
+      }
     }
-    const n = await runNarrator(run.model, turn, events, state, lastShot, run.premise);
+    const humanNarration = swap === 'narrator' ? (await humanInput(turn, 'narrator', 'You are the Narrator. Describe what the Wanderer perceives and what happens (second person, present tense).')).text : null;
+    const n0 = await runNarrator(run.model, turn, events, state, lastShot, run.premise, humanNarration);
     run.calls++;
+    const n = humanNarration ? { ...n0, narration: humanNarration, human: true } : n0;
     record(n);
     console.log(`  narrator: ${n.narration}\n  facts: ${n.facts.map((f) => `${f.op} ${f.id}`).join(', ') || '-'}`);
 
@@ -304,9 +452,15 @@ try {
     if (designTurn) {
       const overview = `shots/turn-${pad(turn)}-overview.jpg`;
       await capture.render(state, join(dir, overview), 'overview');
-      const d = await runDesigner(run.model, turn, events, state, lastShot, join(dir, overview), lastTriangles, styleGuide);
-      run.calls++;
-      const dev: DesignerEvent = { ...d, overview };
+      let dev: DesignerEvent;
+      if (swap === 'designer') {
+        const { text } = await humanInput(turn, 'designer', 'You are the Graphic Designer. What should change about how the world looks right now?');
+        dev = { turn, type: 'designer', critique: text, suggestions: [{ target: 'scene', change: text }], styleGuide, overview, requestUnlock: false, unlockReason: '', human: true, ts: now() };
+      } else {
+        const d = await runDesigner(run.model, turn, events, state, lastShot, join(dir, overview), lastTriangles, styleGuide);
+        run.calls++;
+        dev = { ...d, overview };
+      }
       record(dev);
       styleGuide = dev.styleGuide;
       console.log(`  designer: ${dev.critique}\n${dev.suggestions.map((x) => `    - [${x.target}] ${x.change}`).join('\n')}`);
@@ -331,6 +485,7 @@ try {
       logBuild(pb);
       await render(turn, true);
     }
+    if (run.gameMaster) await cutsceneStep(turn, gm);
     console.log(`  render: ${lastTriangles} tris${tiered ? `, ${fmtBytes(contentBytes(state))}` : ''}${issues.length ? ` | ${issues.length} issues` : ''} · ${Math.round((Date.now() - t0) / 1000)}s`);
 
     if (reviewEvery > 0 && turn > 0 && turn % reviewEvery === 0 && turn < run.maxTurns) {
@@ -345,6 +500,7 @@ try {
         run.calls++;
         record(r);
         turnContext.review = r;
+        if (r.breakthrough) reviewBreakthrough = r.breakthrough;
         console.log(`  reviewer: ${r.assessment}`);
       } catch (err) {
         console.warn(`  reviewer failed: ${(err as Error).message}`);

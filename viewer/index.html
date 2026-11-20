@@ -31,6 +31,9 @@
           <div id="walkhelp" hidden>WASD / arrows move · Shift runs · drag to look · Esc returns to the story</div>
           <div id="caption"></div>
           <div id="tip" hidden></div>
+          <div id="hud" hidden></div>
+          <div id="toast" hidden></div>
+          <button id="skipcut" hidden>Skip cutscene ⏭</button>
           <form id="say" hidden>
             <div class="say-head">Your move · <span id="say-turn"></span></div>
             <textarea id="say-action" rows="2" maxlength="500" placeholder="What do you do, say or ask?"></textarea>
@@ -53,6 +56,7 @@
           <img id="thumb" alt="" hidden />
         </div>
         <span id="turnlabel">–</span>
+        <label id="cutopt" title="Play the cutscene after each turn during playback"><input id="cuts" type="checkbox" checked /> cutscenes</label>
         <select id="speed" title="Speed">
           <option value="0.5">0.5×</option>
           <option value="1" selected>1×</option>

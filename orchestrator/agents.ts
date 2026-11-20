@@ -11,7 +11,7 @@ const PROMPTS = { player: prompt('player'), narrator: prompt('narrator'), builde
  * Per-turn context set by the run loop: the resource-limit summary (tiered runs)
  * and the latest Reviewer notes, which every agent call picks up.
  */
-export const turnContext: { limits: string; review: ReviewerEvent | null } = { limits: '', review: null };
+export const turnContext: { limits: string; review: ReviewerEvent | null; game: string; ruling: string; arc: string } = { limits: '', review: null, game: '', ruling: '', arc: '' };
 
 const reviewNote = (who: string, ...fields: (keyof ReviewerEvent)[]) => {
   const r = turnContext.review;
@@ -20,7 +20,7 @@ const reviewNote = (who: string, ...fields: (keyof ReviewerEvent)[]) => {
   return text ? `## Reviewer's direction for the ${who} (turn ${r.turn})\n${text}` : '';
 };
 
-const imageContent = (file: string | null): Content[] =>
+export const imageContent = (file: string | null): Content[] =>
   file ? [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: readFileSync(file).toString('base64') } }] : [];
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -100,7 +100,7 @@ const DESIGNER_SCHEMA = {
 
 // ---------- context ----------
 
-function story(events: TimelineEvent[], lastTurns = Infinity): string {
+export function story(events: TimelineEvent[], lastTurns = Infinity): string {
   const byTurn = new Map<number, string[]>();
   for (const e of events) {
     const lines = byTurn.get(e.turn) ?? [];
@@ -114,14 +114,14 @@ function story(events: TimelineEvent[], lastTurns = Infinity): string {
   return head + shown.map(([t, l]) => `[${t === 0 ? 'Opening' : `Turn ${t}`}]\n${l.join('\n')}`).join('\n\n');
 }
 
-function factsList(state: WorldState): string {
+export function factsList(state: WorldState): string {
   const built = new Set(Object.values(state.entities).map((e) => e.fact));
   const facts = Object.values(state.facts);
   if (!facts.length) return '(none yet: the world is an empty void)';
   return facts.map((f) => `- ${f.id}: ${f.description} | placement: ${f.placement} | since turn ${f.since}${built.has(f.id) ? '' : ' | NOT YET BUILT'}`).join('\n');
 }
 
-function sceneSummary(state: WorldState, lastTriangles: number): string {
+export function sceneSummary(state: WorldState, lastTriangles: number): string {
   const comps = Object.values(state.components).filter((c) => c.name !== 'placeholder');
   const totalCode = comps.reduce((n, c) => n + c.code.length, 0);
   const showAllCode = totalCode < 45_000;
@@ -148,7 +148,7 @@ function sceneSummary(state: WorldState, lastTriangles: number): string {
 export async function runPlayer(model: string, turn: number, events: TimelineEvent[], shot: string | null) {
   const lastNarr = [...events].reverse().find((e): e is NarratorEvent => e.type === 'narrator');
   const review = reviewNote('Wanderer', 'wanderer');
-  const text = `Story so far:\n\n${story(events)}\n\n---\n${review ? `${review}\n\n` : ''}Turn ${turn}. The Narrator's latest:\n"${lastNarr?.narration ?? ''}"\n\nThe picture shows your current view. What do you do?`;
+  const text = `Story so far:\n\n${story(events)}\n\n---\n${review ? `${review}\n\n` : ''}${turnContext.game ? `## Your game state\n${turnContext.game}\n\n` : ''}Turn ${turn}. The Narrator's latest:\n"${lastNarr?.narration ?? ''}"\n\nThe picture shows your current view. What do you do?`;
   const { output } = await callClaude<{ thought: string; action: string }>({
     label: 'player', model, system: PROMPTS.player, schema: PLAYER_SCHEMA,
     content: [...imageContent(shot), { type: 'text', text }],
@@ -156,7 +156,7 @@ export async function runPlayer(model: string, turn: number, events: TimelineEve
   return { turn, type: 'player', thought: output.thought, action: output.action, ts: new Date().toISOString() } satisfies PlayerEvent;
 }
 
-export async function runNarrator(model: string, turn: number, events: TimelineEvent[], state: WorldState, shot: string | null, premise: string) {
+export async function runNarrator(model: string, turn: number, events: TimelineEvent[], state: WorldState, shot: string | null, premise: string, humanText: string | null = null) {
   const lastBuildTurn = [...events].reverse().find((e): e is BuilderEvent => e.type === 'builder')?.turn;
   const lastBuilds = events.filter((e): e is BuilderEvent => e.type === 'builder' && e.turn === lastBuildTurn);
   const action = [...events].reverse().find((e): e is PlayerEvent => e.type === 'player' && e.turn === turn);
@@ -166,6 +166,8 @@ export async function runNarrator(model: string, turn: number, events: TimelineE
     lastBuilds.length ? `## Builder's notes from last turn\n${lastBuilds.map((b) => b.notes).join('\n')}` : '',
     `## Story so far\n${story(events, 14) || '(nothing yet)'}`,
     reviewNote('Narrator', 'narrative'),
+    turnContext.game ? `## Game state (the Game Master's mechanics)\n${turnContext.game}` : '',
+    turnContext.arc ? `## Where we are\n${turnContext.arc}` : '',
   ];
   if (turn === 0) {
     parts.push(
@@ -174,6 +176,8 @@ export async function runNarrator(model: string, turn: number, events: TimelineE
     );
   } else {
     parts.push(`## Turn ${turn}: the Wanderer acts\n"${action?.action ?? 'looks around'}"\n\nThe picture shows the current rendered view before your response.`);
+    if (humanText) parts.push(`## A PERSON IS PLAYING THE NARRATOR THIS TURN\nTheir narration is final and will be shown verbatim: "${humanText}"\nYour job: set \`narration\` to exactly their text, and output the facts and movement it establishes (rich, buildable descriptions and placements, consistent with the world).`);
+    if (turnContext.ruling) parts.push(`## The Game Master's ruling (narrate exactly this outcome, including costs, new mechanics and consequences, woven naturally into the world)\n${turnContext.ruling}`);
   }
   const { output } = await callClaude<{ narration: string; movement: string; facts: FactChange[] }>({
     label: 'narrator', model, system: PROMPTS.narrator, schema: NARRATOR_SCHEMA,
@@ -251,8 +255,8 @@ export async function runDesigner(
 
 const REVIEWER_SCHEMA = {
   type: 'object',
-  properties: Object.fromEntries(['assessment', 'narrative', 'visual', 'builder', 'wanderer', 'experience'].map((k) => [k, { type: 'string' }])),
-  required: ['assessment', 'narrative', 'visual', 'builder', 'wanderer', 'experience'],
+  properties: Object.fromEntries(['assessment', 'narrative', 'visual', 'builder', 'wanderer', 'experience', 'breakthrough'].map((k) => [k, { type: 'string' }])),
+  required: ['assessment', 'narrative', 'visual', 'builder', 'wanderer', 'experience', 'breakthrough'],
   additionalProperties: false,
 };
 
@@ -270,6 +274,8 @@ export async function runReviewer(
     `## Designer's style guide\n${styleGuide || '(none)'}`,
     `## Designer's recent critiques\n${recent('designer', 4, (e) => (e.type === 'designer' ? `[${e.turn}] ${e.critique}` : ''))}`,
     `## Builder's recent notes\n${recent('builder', 6, (e) => (e.type === 'builder' ? `[${e.turn}${e.stage === 'polish' ? ' polish' : ''}] ${e.notes}` : ''))}`,
+    turnContext.game ? `## Game state\n${turnContext.game}\n\n## Game Master's recent rulings\n${recent('gamemaster', 5, (e) => (e.type === 'gamemaster' ? `[${e.turn}] ${e.announce} | ${e.ruling}` : ''))}` : '',
+    events.some((e) => e.type === 'cutscene') ? `## Recent cutscenes\n${recent('cutscene', 5, (e) => (e.type === 'cutscene' ? `[${e.turn}] ${e.cutscene.style}${e.breakthrough ? ' (BREAKTHROUGH)' : ''}` : ''))}` : '',
     turnContext.review ? `## Your previous review (turn ${turnContext.review.turn})\n${turnContext.review.assessment}` : '',
   ];
   const { output } = await callClaude<Omit<ReviewerEvent, 'turn' | 'type' | 'ts'>>({

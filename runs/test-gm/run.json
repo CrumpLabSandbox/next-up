@@ -1,0 +1,14 @@
+{
+  "id": "test-gm",
+  "created": "2026-11-20T13:27:59.453Z",
+  "premise": "",
+  "model": "sonnet",
+  "maxTurns": 3,
+  "designEvery": 1,
+  "status": "complete",
+  "turnsCompleted": 3,
+  "calls": 31,
+  "mode": "tiered",
+  "tier": 0,
+  "gameMaster": true
+}

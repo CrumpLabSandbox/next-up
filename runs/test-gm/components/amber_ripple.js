@@ -1,0 +1,3 @@
+// expanding amber ring; params: max (m)
+export function build(T,p,c){const m=new T.MeshBasicMaterial({color:'#ffb347',blending:T.AdditiveBlending,transparent:true,opacity:0,depthWrite:false,toneMapped:false}),r=new T.Mesh(new T.RingGeometry(.9,1,64),m);r.rotation.x=-Math.PI/2;r.position.y=.02;const g=new T.Group();g.add(r);g.userData={m,r};return g}
+export function update(o,t,d,p){const k=(t%2.5)/2.5,s=.2+k*((p.max||6)-.2);o.userData.r.scale.set(s,s,s);o.userData.m.opacity=.35*(1-k)}

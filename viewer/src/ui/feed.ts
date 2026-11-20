@@ -43,11 +43,11 @@ export function renderEvent(ev: TimelineEvent, runId: string): HTMLElement | nul
     case 'player':
       return el(`<div class="msg player"><div class="who">Wanderer${ev.human ? ' (you)' : ''}</div><div class="action">${esc(ev.action)}</div><div class="thought">${esc(ev.thought)}</div></div>`);
     case 'narrator':
-      return el(`<div class="msg narrator"><div class="who">Narrator</div><div class="narration">${esc(ev.narration)}</div>${ev.movement ? `<div class="move">↳ ${esc(ev.movement)}</div>` : ''}<div class="chips">${factChips(ev)}</div></div>`);
+      return el(`<div class="msg narrator"><div class="who">Narrator${ev.human ? ' (you)' : ''}</div><div class="narration">${esc(ev.narration)}</div>${ev.movement ? `<div class="move">↳ ${esc(ev.movement)}</div>` : ''}<div class="chips">${factChips(ev)}</div></div>`);
     case 'builder':
       return el(`<div class="msg builder${ev.stage === 'polish' ? ' polish' : ''}"><div class="who">Builder${ev.stage === 'polish' ? ' · polish' : ''}${ev.attempts > 1 ? ` · ${ev.attempts} tries` : ''}</div>${builderBody(ev)}</div>`);
     case 'designer':
-      return el(`<div class="msg designer"><div class="who">Graphic Designer</div><div>${esc(ev.critique)}</div>${ev.requestUnlock ? `<div class="ask unlock">▲ asks for more room: ${esc(ev.unlockReason ?? '')}</div>` : ''}${ev.engineRequest ? `<div class="ask engine">⚙ asks for a new engine: ${esc(ev.engineRequest)}</div>` : ''}<ol class="suggest">${ev.suggestions.map((x) => `<li><code>${esc(x.target)}</code> ${esc(x.change)}</li>`).join('')}</ol>${ev.overview ? `<img class="shot" loading="lazy" src="runs/${esc(runId)}/${esc(ev.overview)}" alt="Overview the designer reviewed">` : ''}<details><summary>style guide</summary><div class="guide">${esc(ev.styleGuide)}</div></details></div>`);
+      return el(`<div class="msg designer"><div class="who">Graphic Designer${ev.human ? ' (you)' : ''}</div><div>${esc(ev.critique)}</div>${ev.requestUnlock ? `<div class="ask unlock">▲ asks for more room: ${esc(ev.unlockReason ?? '')}</div>` : ''}${ev.engineRequest ? `<div class="ask engine">⚙ asks for a new engine: ${esc(ev.engineRequest)}</div>` : ''}<ol class="suggest">${ev.suggestions.map((x) => `<li><code>${esc(x.target)}</code> ${esc(x.change)}</li>`).join('')}</ol>${ev.overview ? `<img class="shot" loading="lazy" src="runs/${esc(runId)}/${esc(ev.overview)}" alt="Overview the designer reviewed">` : ''}<details><summary>style guide</summary><div class="guide">${esc(ev.styleGuide)}</div></details></div>`);
     case 'render': {
       if (!ev.shot && !ev.errors.length) return null;
       const label = ev.final === false ? 'after build' : 'view';
@@ -58,6 +58,19 @@ export function renderEvent(ev: TimelineEvent, runId: string): HTMLElement | nul
       return el(`<div class="banner budget"><b>▲ Budget ${ev.tier === 0 ? 'starts at' : 'unlocked:'} ${fmtBytes(ev.limit)}</b>${esc(ev.reason)}</div>`);
     case 'engineer':
       return el(`<div class="msg engineer"><div class="who">Engineer · ${ev.ok ? `built ${esc(ev.version ?? '')}` : 'failed'} · ${ev.minutes} min</div><div class="request">Request: ${esc(ev.request)}</div><div>${esc(ev.notes)}</div>${ev.problems.length ? `<div class="chips">${ev.problems.map((p) => `<span class="chip bad">${esc(p)}</span>`).join('')}</div>` : ''}</div>`);
+    case 'gamemaster': {
+      const r = ev.roll;
+      const roll = r ? (r.visible
+        ? `<div class="rollline">${esc(r.presentation || 'dice')}: ${r.dice.join(' + ')}${r.modifier ? ` ${r.modifier > 0 ? '+' : '−'} ${Math.abs(r.modifier)}` : ''} = ${r.total} · ${r.band === 'hit' ? 'success' : r.band === 'partial' ? 'success at a cost' : 'miss: fail forward'}${r.reason ? ` · ${esc(r.reason)}` : ''}</div>`
+        : `<div class="rollline hidden">a hidden roll was made</div>`) : '';
+      const grant = ev.grantRole ? `<div class="ask unlock">✧ Unlocked: next turn you play the ${esc(ev.grantRole.role === 'gamemaster' ? 'Game Master' : ev.grantRole.role === 'designer' ? 'Graphic Designer' : 'Narrator')}. ${esc(ev.grantRole.reason)}</div>` : '';
+      const ops = ev.ops.map((o) => `<span class="chip">${esc(o.op)} ${esc(o.id)}</span>`).join('');
+      return el(`<div class="msg gamemaster"><div class="who">Game Master${ev.human ? ' (you)' : ''} · ${esc(ev.pacing)}</div><div class="announce">${esc(ev.announce)}</div>${roll}<div>${esc(ev.ruling)}</div>${grant}${ev.breakthrough ? `<div class="breakthrough">★ breakthrough: ${esc(ev.breakthrough)}</div>` : ''}<div class="chips">${ops}</div></div>`);
+    }
+    case 'cutscene': {
+      const c = ev.cutscene;
+      return el(`<div class="msg cutscene"><div class="who">Cutscene · tier ${ev.tier + 1} · ${c.duration}s · ${c.shots.length} shot${c.shots.length === 1 ? '' : 's'}</div>${ev.breakthrough ? `<div class="breakthrough">★ BREAKTHROUGH · ${esc(ev.breakthrough)}</div>` : ''}${c.title ? `<div class="announce">${esc(c.title)}</div>` : ''}<div>${esc(ev.notes || c.style)}</div><div class="stills">${ev.stills.map((s) => `<img loading="lazy" src="runs/${esc(runId)}/${esc(s)}" alt="">`).join('')}</div><button data-play>▶ play cutscene</button></div>`);
+    }
     case 'reviewer': {
       const sec = (label: string, text: string) => (text ? `<details><summary>${label}</summary><div class="guide">${esc(text)}</div></details>` : '');
       return el(`<div class="msg reviewer"><div class="who">Reviewer</div><div>${esc(ev.assessment)}</div>${sec('narrative → Narrator', ev.narrative)}${sec('visual → Designer', ev.visual)}${sec('detail → Builder', ev.builder)}${sec('questions → Wanderer', ev.wanderer)}${sec('viewer experience', ev.experience)}</div>`);
@@ -72,6 +85,7 @@ export function renderEvent(ev: TimelineEvent, runId: string): HTMLElement | nul
 
 export class Feed {
   private shown = 0;
+  onPlayCutscene: (turn: number) => void = () => {};
   private turnEls = new Map<number, HTMLElement>();
   onSeekTurn: (turn: number) => void = () => {};
 
@@ -90,7 +104,10 @@ export class Feed {
         this.turnEls.set(ev.turn, block);
       }
       const node = renderEvent(ev, runId);
-      if (node) block.append(node);
+      if (node) {
+        node.querySelector<HTMLButtonElement>('[data-play]')?.addEventListener('click', () => this.onPlayCutscene(ev.turn));
+        block.append(node);
+      }
     }
     this.shown = count;
     this.root.scrollTop = this.root.scrollHeight;

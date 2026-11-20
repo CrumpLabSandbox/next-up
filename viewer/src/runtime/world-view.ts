@@ -10,7 +10,8 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { COMPONENT_LIB } from '../../../shared/component-lib.js';
 import { makeCtx, moduleUrl, countTriangles } from '../../../shared/component-api.js';
-import type { Entity, WorldState } from '../../../shared/types';
+import type { Entity, Environment, WorldState } from '../../../shared/types';
+import { cameraAt, envAt, poseAt, propVisible, type Cutscene } from '../../../shared/cutscene';
 import { Atmosphere } from './atmosphere';
 import { Avatar, compassToYaw } from './avatar';
 import { emptyWorld } from '../../../shared/world';
@@ -80,6 +81,10 @@ export class WorldView {
   private dragging = false;
   private raycaster = new THREE.Raycaster();
   private storyAvatar = { at: [0, 0, 0] as [number, number, number], facing: 0 };
+  private cut: {
+    cs: Cutscene; props: Map<string, Live>; env: Environment; t: number; playing: boolean; onEnd: (() => void) | null;
+  } | null = null;
+  private lastState: WorldState | null = null;
   private running = false;
   onError: (msg: string) => void = () => {};
 
@@ -182,6 +187,7 @@ export class WorldView {
   }
 
   private async apply(state: WorldState, animate: boolean) {
+    this.lastState = state;
     this.atmo.setEnv(state.env, animate);
     this.storyAvatar = { at: [...state.avatar.at] as [number, number, number], facing: state.avatar.facing };
     if (!this.avatar.manual) this.avatar.setTarget(state.avatar.at, state.avatar.facing, animate);
@@ -300,6 +306,101 @@ export class WorldView {
     return { desired, look };
   }
 
+  // ---------- cutscenes ----------
+
+  /** Sets up a cutscene over the current state: builds its temporary props. */
+  async beginCutscene(cs: Cutscene) {
+    this.endCutscene();
+    await this.applying;
+    const state = this.lastState;
+    if (!state) return;
+    const props = new Map<string, Live>();
+    for (const p of cs.props ?? []) {
+      const def = state.components[p.component];
+      if (!def) continue;
+      const e: Entity = {
+        id: `cut_${p.id}`, component: p.component, params: p.params ?? {}, at: p.at, rotation: p.rotation ?? 0, scale: p.scale ?? 1,
+        behavior: null, fact: null, since: state.turn, updated: state.turn,
+      };
+      const l = await this.build(e, def.code, `cut|${p.id}`, state);
+      this.placeRoot(l, false);
+      l.root.visible = false;
+      this.scene.add(l.root);
+      props.set(p.id, l);
+    }
+    this.cut = { cs, props, env: state.env, t: 0, playing: false, onEnd: null };
+  }
+
+  /** Poses the camera, animated entities, props and environment at time t. */
+  cutsceneFrame(t: number) {
+    const c = this.cut;
+    if (!c) return;
+    const cam = cameraAt(c.cs, t);
+    this.camera.position.set(...cam.pos);
+    this.lookAt.set(...cam.target);
+    this.camera.lookAt(this.lookAt);
+    if (this.camera.fov !== cam.fov) { this.camera.fov = cam.fov ?? 55; this.camera.updateProjectionMatrix(); }
+    const targets = new Set((c.cs.animations ?? []).map((a) => a.target));
+    const apply = (root: THREE.Object3D, base: { at: [number, number, number]; rotation: number; scale: number }, id: string) => {
+      const pose = targets.has(id) ? poseAt(c.cs, id, base, t) : base;
+      root.position.set(...pose.at);
+      root.rotation.y = compassToYaw(pose.rotation);
+      root.scale.setScalar(pose.scale);
+    };
+    if (targets.has('wanderer')) apply(this.avatar.group, { at: this.storyAvatar.at, rotation: this.storyAvatar.facing, scale: 1 }, 'wanderer');
+    for (const id of targets) {
+      const l = this.live.get(id);
+      if (l) apply(l.root, { at: l.entity.at, rotation: l.entity.rotation, scale: l.entity.scale }, id);
+    }
+    for (const p of c.cs.props ?? []) {
+      const l = c.props.get(p.id);
+      if (!l) continue;
+      l.root.visible = propVisible(p, t);
+      apply(l.root, { at: p.at, rotation: p.rotation ?? 0, scale: p.scale ?? 1 }, p.id);
+    }
+    if (c.cs.env?.length) this.atmo.setEnv(envAt(c.cs, c.env, t), false);
+  }
+
+  /** Plays a cutscene in real time; onEnd fires when it finishes (not when stopped). */
+  async playCutscene(cs: Cutscene, onEnd: () => void) {
+    await this.beginCutscene(cs);
+    if (!this.cut) { onEnd(); return; }
+    this.cut.playing = true;
+    this.cut.onEnd = onEnd;
+  }
+
+  cutsceneTime() { return this.cut ? this.cut.t : -1; }
+
+  /** Removes props and restores everything the cutscene touched. */
+  endCutscene() {
+    const c = this.cut;
+    if (!c) return;
+    this.cut = null;
+    for (const l of c.props.values()) { this.scene.remove(l.root); disposeTree(l.root); }
+    for (const a of c.cs.animations ?? []) {
+      const l = this.live.get(a.target);
+      if (l) this.placeRoot(l, false);
+    }
+    this.avatar.setTarget(this.storyAvatar.at, this.storyAvatar.facing, false);
+    this.atmo.setEnv(c.env, false);
+    this.camera.fov = 55;
+    this.camera.updateProjectionMatrix();
+    this.placeCameraBehind(true);
+  }
+
+  /** Headless: render one deterministic cutscene frame at time t. */
+  async renderCutsceneStill(cs: Cutscene, t: number) {
+    await this.beginCutscene(cs);
+    this.avatar.snap();
+    for (const l of this.live.values()) l.born = NaN;
+    this.time = t;
+    this.updateEntities(0.016);
+    this.cutsceneFrame(t);
+    for (let i = 0; i < 40; i++) this.atmo.update(0.1, this.avatar.position, this.glowOpacity());
+    this.draw();
+    this.endCutscene();
+  }
+
   /** High wide shot framing every entity and the wanderer (for the Designer). */
   private placeCameraOverview() {
     const pts = [...this.live.values()].map((l) => l.root.position.clone());
@@ -378,6 +479,19 @@ export class WorldView {
 
   private tick(dt: number) {
     this.time += dt;
+    if (this.cut?.playing) {
+      this.cut.t += dt;
+      this.updateEntities(dt);
+      this.cutsceneFrame(Math.min(this.cut.t, this.cut.cs.duration));
+      this.atmo.update(dt, this.avatar.position, this.glowOpacity());
+      this.draw();
+      if (this.cut.t >= this.cut.cs.duration) {
+        const done = this.cut.onEnd;
+        this.endCutscene();
+        done?.();
+      }
+      return;
+    }
     if (this.mode === 'walk') this.walk(dt);
     else this.avatar.update(dt);
     this.updateEntities(dt);

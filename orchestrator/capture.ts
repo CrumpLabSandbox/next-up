@@ -4,6 +4,7 @@ import { createServer, type ViteDevServer } from 'vite';
 import { chromium, type Browser, type Page } from 'playwright';
 import { fileURLToPath } from 'node:url';
 import type { WorldState } from '../shared/types';
+import type { Cutscene } from '../shared/cutscene';
 
 const CONFIG = fileURLToPath(new URL('../viewer/vite.config.ts', import.meta.url));
 
@@ -37,6 +38,17 @@ export class Capture {
     );
     await this.page.screenshot({ path: file, type: 'jpeg', quality: 72 });
     return { errors: [...res.errors, ...this.pageErrors], triangles: res.triangles, lights: res.lights };
+  }
+
+  /** Renders one cutscene frame at time t to a JPEG. */
+  async renderCutscene(state: WorldState, cs: Cutscene, t: number, file: string): Promise<{ errors: string[] }> {
+    this.pageErrors = [];
+    const res = await this.page.evaluate(
+      async ([s, c, tt]) => (window as unknown as { __nextup: { renderCutscene(s: unknown, c: unknown, t: number): Promise<{ errors: string[] }> } }).__nextup.renderCutscene(s, c, tt as number),
+      [state as unknown as Record<string, unknown>, cs as unknown as Record<string, unknown>, t] as const,
+    );
+    await this.page.screenshot({ path: file, type: 'jpeg', quality: 72 });
+    return { errors: [...res.errors, ...this.pageErrors] };
   }
 
   async stop() {

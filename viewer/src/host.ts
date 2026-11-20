@@ -3,6 +3,7 @@
 //   engine-host.html?engine=<url of engine.js | legacy>[&capture=1]
 import { WorldView, type CameraMode } from './runtime/world-view';
 import type { WorldState } from '../../shared/types';
+import type { Cutscene } from '../../shared/cutscene';
 
 export interface Pose { position: number[]; target: number[] }
 export interface Engine {
@@ -17,6 +18,9 @@ export interface Engine {
   pick?(x: number, y: number): { id: string; fact: string | null } | null;
   errors?(): string[];
   dispose?(): void;
+  playCutscene?(cs: Cutscene, onEnd: () => void): Promise<void>;
+  stopCutscene?(): void;
+  cutsceneTime?(): number;
 }
 
 const params = new URLSearchParams(location.search);
@@ -41,6 +45,46 @@ function legacyEngine(): Engine {
       return id && state?.entities[id] ? { id, fact: state.entities[id].fact } : null;
     },
     errors: () => view.drainErrors(),
+    playCutscene: (cs, onEnd) => view.playCutscene(cs, onEnd),
+    stopCutscene: () => view.endCutscene(),
+    cutsceneTime: () => view.cutsceneTime(),
+  };
+}
+
+/** Letterbox bars, fades and captions drawn over the canvas while a cutscene plays. */
+function cutsceneOverlay() {
+  const root = document.createElement('div');
+  root.style.cssText = 'position:fixed;inset:0;pointer-events:none;font-family:ui-serif,Georgia,serif;color:#f4f1ea;';
+  root.innerHTML = `
+    <div data-bar style="position:absolute;left:0;right:0;top:0;height:0;background:#000;transition:height .6s"></div>
+    <div data-bar style="position:absolute;left:0;right:0;bottom:0;height:0;background:#000;transition:height .6s"></div>
+    <div data-fade style="position:absolute;inset:0;background:#000;opacity:0"></div>
+    <div data-title style="position:absolute;left:0;right:0;top:40%;text-align:center;font-size:clamp(22px,4vw,48px);letter-spacing:.12em;text-transform:uppercase;text-shadow:0 2px 18px #000;opacity:0;transition:opacity .5s"></div>
+    <div data-sub style="position:absolute;left:8%;right:8%;bottom:16%;text-align:center;font-size:clamp(14px,2vw,22px);font-style:italic;text-shadow:0 1px 10px #000;opacity:0;transition:opacity .5s"></div>`;
+  document.body.append(root);
+  const [top, bottom] = root.querySelectorAll<HTMLElement>('[data-bar]');
+  const fade = root.querySelector<HTMLElement>('[data-fade]')!;
+  const title = root.querySelector<HTMLElement>('[data-title]')!;
+  const sub = root.querySelector<HTMLElement>('[data-sub]')!;
+  return {
+    frame(cs: Cutscene | null, t: number) {
+      const on = !!cs && t >= 0;
+      const bar = on && cs!.letterbox ? '10%' : '0';
+      top.style.height = bar; bottom.style.height = bar;
+      let f = 0;
+      if (on) {
+        const fi = cs!.fade?.in ?? 0, fo = cs!.fade?.out ?? 0;
+        if (fi > 0 && t < fi) f = 1 - t / fi;
+        if (fo > 0 && t > cs!.duration - fo) f = Math.max(f, (t - (cs!.duration - fo)) / fo);
+      }
+      fade.style.opacity = String(Math.max(0, Math.min(1, f)));
+      const cap = (style: string) => (on ? (cs!.captions ?? []).find((c) => (c.style ?? 'subtitle') === style && t >= c.start && t <= c.end) : undefined);
+      const tc = cap('title'), sc = cap('subtitle');
+      if (tc) title.textContent = tc.text;
+      if (sc) sub.textContent = sc.text;
+      title.style.opacity = tc ? '1' : '0';
+      sub.style.opacity = sc ? '1' : '0';
+    },
   };
 }
 
@@ -89,6 +133,14 @@ new ResizeObserver(fit).observe(document.body);
 (window as unknown as Record<string, unknown>).__hostReady = true;
 
 if (!capture) {
+  const overlay = cutsceneOverlay();
+  let overlayCut: Cutscene | null = null;
+  const overlayLoop = () => {
+    if (overlayCut) overlay.frame(overlayCut, engine.cutsceneTime?.() ?? -1);
+    requestAnimationFrame(overlayLoop);
+  };
+  requestAnimationFrame(overlayLoop);
+
   // Engines only start animating once they have a world to draw.
   let started = false;
   let pendingCamera: [string, Pose | null] = ['follow', null];
@@ -112,6 +164,18 @@ if (!capture) {
       }
       else if (m.method === 'getCamera') result = engine.getCamera();
       else if (m.method === 'errors') result = errors();
+      else if (m.method === 'playCutscene') {
+        const cs = m.args[0] as Cutscene;
+        if (!engine.playCutscene) { post({ event: 'cutsceneEnd' }); }
+        else {
+          overlayCut = cs;
+          await engine.playCutscene(cs, () => { overlayCut = null; overlay.frame(null, -1); post({ event: 'cutsceneEnd' }); });
+        }
+      } else if (m.method === 'stopCutscene') {
+        engine.stopCutscene?.();
+        overlayCut = null;
+        overlay.frame(null, -1);
+      }
       post({ id: m.id, result });
     } catch (err) {
       post({ id: m.id, error: String((err as Error).message ?? err) });

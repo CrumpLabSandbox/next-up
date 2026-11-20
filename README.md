@@ -15,6 +15,13 @@ Four Claude agents take turns:
 
 A turn is: Wanderer → Narrator → Builder → render → Designer → Builder (polish) → render. Both renders are kept, so you can see what each polish changed. Every step is appended to `runs/<id>/timeline.jsonl`. The world at any point is just the replay of that log, so the viewer can play the whole thing back, scrub and watch things materialize.
 
+## Game Master runs (world-06, the default)
+
+`npm run world -- --human` (20 turns by default; extend with `--resume <id> --turns 30`). On top of the tiered three.js setup:
+- **Game Master** (each turn, after your move): rules on the move with an open, extendable set of mechanics (`shared/game.ts`: meters, clocks, inventory, quests, conditions, relations, custom kinds). It uses seeded pre-rolled dice when warranted (visible or hidden, presented as dice, coins, omens…), and every outcome fails forward. Mechanics appear only when the story earns them, from a catalog in `orchestrator/prompts/gamemaster.md`. Each mechanic appears in a HUD that starts hidden, using built-in widgets or custom ones composed from simple pieces.
+- **Cutscene Director** (after every turn): a short scripted film (`shared/cutscene.ts`: camera shots, entity and Wanderer animations, temporary props, light changes, captions, letterbox and fades). Quality limits follow the resource tier. **Breakthroughs** (nominated by the Game Master or Reviewer, or by seeded chance, capped per run) get two tiers more and a license for a striking style. The viewer plays each cutscene between turns, with a Skip button and a toggle.
+- **Role swaps:** rarely, the Game Master grants you one turn as the Narrator, Designer or Game Master while an AI walks the Wanderer. The input box changes to match.
+
 ## Tiered three.js runs (world-04, the default)
 
 `npm run world` uses the three.js runtime throughout (no engine swaps). The world's own content has resource tiers that the Graphic Designer must ask to unlock (at most one every 6 turns): 8 KB / 8k triangles / 1 light → 32 KB / 30k / 2 → 128 KB / 80k / 4 → 512 KB / 200k / 6 → 2 MB / 500k / 8. Builds over the limit are rejected and retried.
@@ -37,7 +44,9 @@ New runs grow in **orders of magnitude**. The whole world (engine code, librarie
 npm install
 npx playwright install chromium-headless-shell   # once, for screenshots
 
-npm run world -- --turns 50                  # new tiered three.js run (uses your Claude subscription via `claude -p`)
+npm run world -- --human                     # Game Master run, you play the Wanderer (uses your Claude subscription via `claude -p`)
+npm run world -- --no-game-master --turns 50 # world-04 style (no Game Master, no cutscenes)
+npm run say -- <run-id> "what you do"        # submit your move from the terminal instead of the viewer box
 npm run world:ladder -- --turns 50           # world-03 style: growing budget + Engineer-built engines
 npm run world:legacy -- --turns 50           # world-01/02 style: fixed three.js runtime
 npm run world -- --turns 50 --premise "..."  # optional seed for the world
