@@ -1,0 +1,3 @@
+// Warm flickering light orb with glow sprite and point light
+export function build(THREE,p,ctx){const g=new THREE.Group();g.add(new THREE.Mesh(new THREE.SphereGeometry(.1,12,8),new THREE.MeshBasicMaterial({color:'#ffd89a'})));const t=ctx.dataTexture(32,32,(u,v)=>{const a=Math.max(0,1-Math.hypot(u-.5,v-.5)*2);const s=a*a;return[255*s,200*s,110*s]});const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,blending:THREE.AdditiveBlending,transparent:true,opacity:.5,depthWrite:false}));sp.scale.setScalar(.45);g.add(sp);const l=new THREE.PointLight('#ff9a3c',3.5,7,2);g.add(l);g.userData.l=l;g.userData.s=sp;return g}
+export function update(o,t){const k=1+.12*Math.sin(t*9)+.08*Math.sin(t*13.7+1);o.userData.l.intensity=3.5*k;o.userData.s.scale.setScalar(.45*(.95+.05*k))}

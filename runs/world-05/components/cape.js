@@ -1,0 +1,3 @@
+// Star-hemmed indigo cape trailing south, rippling
+export function build(T,p,ctx){const g=new T.Group(),q=new T.PlaneGeometry(.76,1.5,8,12).translate(0,-.75,0),P=q.attributes.position;for(let i=0;i<P.count;i++)P.setX(i,P.getX(i)*(1-P.getY(i)*.29));const h=new T.Group();h.add(new T.Mesh(q,ctx.pbr('#24207a',{roughness:.85,side:2,emissive:'#3a3a9a',emissiveIntensity:.08})));const s=new T.BufferGeometry();s.setAttribute('position',P);s.setDrawRange(90,27);h.add(new T.Points(s,new T.PointsMaterial({color:'#c8ccd8',size:.04})));h.rotation.x=-.6;g.add(h);g.userData.q=q;return g}
+export function update(o,t){const q=o.userData.q,P=q.attributes.position;for(let i=0;i<P.count;i++){const y=P.getY(i);P.setZ(i,Math.sin(y*5-t*2.5+P.getX(i)*3)*.08*(.2-y/1.5))}P.needsUpdate=true}

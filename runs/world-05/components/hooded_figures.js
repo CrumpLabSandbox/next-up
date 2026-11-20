@@ -1,0 +1,2 @@
+// Row of 5 tall hooded silhouettes
+export function build(T,p,ctx){const g=new T.Group(),m=ctx.pbr('#030409',{roughness:1});for(let i=0;i<5;i++){const h=2.3+ctx.rng()*.3,f=new T.Group(),a=(e,y,x)=>{const o=new T.Mesh(e,m);o.position.set(x||0,y,0);f.add(o)};a(new T.CylinderGeometry(.1,.3,h*.8,8),h*.4);a(new T.ConeGeometry(.18,.5,8),h-.25);for(const s of[-1,1])a(new T.CylinderGeometry(.03,.03,h*.5,5),h*.55,s*.3);f.position.set((i-2)*2.5+ctx.range(-.3,.3),0,ctx.range(-.5,.5));g.add(f)}return g}

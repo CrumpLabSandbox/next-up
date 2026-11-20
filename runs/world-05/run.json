@@ -6,9 +6,13 @@
   "maxTurns": 10,
   "designEvery": 1,
   "status": "running",
-  "turnsCompleted": 0,
-  "calls": 0,
+  "turnsCompleted": 3,
+  "calls": 20,
   "mode": "tiered",
   "tier": 0,
-  "human": true
+  "human": true,
+  "awaiting": {
+    "turn": 4,
+    "since": "2026-11-20T12:05:06.748Z"
+  }
 }

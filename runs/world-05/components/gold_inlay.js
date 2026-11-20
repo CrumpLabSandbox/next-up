@@ -1,0 +1,2 @@
+// Gold seam threads; r
+export function build(THREE,p,ctx){const R=p.r||10,a=[],c=[];const L=(x,z,X,Z)=>{a.push(x,0,z,X,0,Z);for(const[q,r]of[[x,z],[X,Z]]){const t=Math.max(0,Math.min(1,(8-Math.hypot(q,r))/5));c.push(.23+.65*t,.17+.53*t,.06+.23*t)}};for(let x=-R;x<=R;x+=2){L(x,-R,x,R);L(-R,x,R,x)}const gm=new THREE.BufferGeometry();gm.setAttribute('position',new THREE.Float32BufferAttribute(a,3));gm.setAttribute('color',new THREE.Float32BufferAttribute(c,3));const o=new THREE.LineSegments(gm,new THREE.LineBasicMaterial({vertexColors:true}));o.position.y=.012;return o}
