@@ -1,2 +1,2 @@
-// glyphs
-export function build(T,p,ctx){const a=[],R=()=>ctx.rng()*3|0;for(let i=0;i<8;i++)for(let k=0;k<4;k++){const x=R()*.5-.5,z=R()*.45,X=R()*.5-.5,Z=R()*.45,d=X-x,e=Z-z;a.push(new T.BoxGeometry(Math.hypot(d,e)+.1,.02,.09).rotateY(Math.atan2(e,d)).translate((x+X)/2,0,-i*1.2-(z+Z)/2))}return new T.Mesh(ctx.lib.mergeGeometries(a),new T.MeshBasicMaterial({color:'#ffc84a'}))}
+// unused
+export function build(T){return new T.Group()}

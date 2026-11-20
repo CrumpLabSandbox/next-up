@@ -1,0 +1,3 @@
+// thin gold dust veil sprites; params n
+export function build(T,p,ctx){const g=new T.Group(),t=ctx.dataTexture(32,32,(u,v)=>{const a=Math.max(0,1-Math.hypot(u-.5,v-.5)*2),s=a*a;return[255*s,200*s,170*s]});for(let i=0;i<(p.n||20);i++){const s=new T.Sprite(new T.SpriteMaterial({map:t,blending:T.AdditiveBlending,transparent:true,opacity:ctx.range(.05,.1),depthWrite:false,color:ctx.pick(['#ffd27a','#e89aa0'])}));s.position.set(ctx.range(-45,45),ctx.range(0,15),ctx.range(-35,35));s.scale.setScalar(ctx.range(8,16));g.add(s)}return g}
+export function update(o,t){o.children.forEach((s,i)=>{s.position.y+=Math.sin(t*.3+i)*.01;s.position.x+=Math.cos(t*.2+i)*.01})}

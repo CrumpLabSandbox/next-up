@@ -1,2 +1,2 @@
-// 5 bowed blue-faced figures
-export function build(T,p,ctx){const g=new T.Group(),m=ctx.pbr('#030409',{roughness:1}),B=new T.MeshBasicMaterial({color:'#bfe4ff',fog:false});[-5,-3.5,-2,2,3.5].forEach(x=>{const h=2.3+ctx.rng()*.3,f=new T.Group(),s=x<0?1:-1,a=(e,y,X,M,z)=>{const o=new T.Mesh(e,M||m);o.position.set(X||0,y,0);o.rotation.z=z||0;f.add(o)};a(new T.CylinderGeometry(.1,.3,h*.8,8),h*.4);a(new T.SphereGeometry(.16,10,8),h-.15,0,B);a(new T.CylinderGeometry(.03,.03,h*.5,5),h*.5,s*.3,m,s*.6);f.rotation.x=-.12;f.position.set(x,0,ctx.range(-.5,.5));g.add(f)});return g}
+// unused
+export function build(T){return new T.Group()}

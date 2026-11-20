@@ -1,3 +1,3 @@
-// mist
-export function build(T,p,ctx){const a=[];for(let i=0;i<400;i++){const t=i/400,r=1+t*9,A=t*40;a.push(Math.cos(A)*r,5+ctx.rng()*10,Math.sin(A)*r)}const s=new T.BufferGeometry();s.setAttribute('position',new T.Float32BufferAttribute(a,3));return new T.Points(s,new T.PointsMaterial({color:'#8fb8ff',size:.12,transparent:true,opacity:.35,sizeAttenuation:true,blending:T.AdditiveBlending,depthWrite:false}))}
-export function update(o,t){o.rotation.y=t*.25}
+// green glass tower 400m, glowing crack, rotating shards
+export function build(T,p,ctx){const g=new T.Group(),t=new T.Mesh(new T.CylinderGeometry(14,22,400,8).translate(0,200,0),ctx.pbr('#6fe0a8',{transparent:true,opacity:.6,roughness:.1,emissive:'#3fd08a',emissiveIntensity:.9})),c=new T.Mesh(new T.BoxGeometry(3,380,1),new T.MeshBasicMaterial({color:'#e8fff0',fog:false})),r=new T.Group(),sm=ctx.pbr('#9fffd0',{emissive:'#9fffd0',emissiveIntensity:.8});c.position.set(0,200,19);for(let i=0;i<12;i++){const s=new T.Mesh(new T.BoxGeometry(4,10,2),sm),a=i/12*6.283;s.position.set(Math.cos(a)*45,ctx.range(-8,8),Math.sin(a)*45);s.rotation.y=-a;r.add(s)}r.position.y=410;g.add(t,c,r);g.userData.r=r;return g}
+export function update(o,t){o.userData.r.rotation.y=t*.15}
