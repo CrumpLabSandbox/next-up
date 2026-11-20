@@ -1,2 +1,3 @@
-// x
-export function build(T){return new T.Group()}
+// mist
+export function build(T,p,ctx){const a=[];for(let i=0;i<400;i++){const t=i/400,r=1+t*9,A=t*40;a.push(Math.cos(A)*r,5+ctx.rng()*10,Math.sin(A)*r)}const s=new T.BufferGeometry();s.setAttribute('position',new T.Float32BufferAttribute(a,3));return new T.Points(s,new T.PointsMaterial({color:'#8fb8ff',size:.12,transparent:true,opacity:.35,sizeAttenuation:true,blending:T.AdditiveBlending,depthWrite:false}))}
+export function update(o,t){o.rotation.y=t*.25}

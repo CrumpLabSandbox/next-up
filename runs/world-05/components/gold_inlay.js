@@ -1,2 +1,2 @@
-// Gold seam threads; r
-export function build(THREE,p,ctx){const R=p.r||10,a=[],c=[];const L=(x,z,X,Z)=>{a.push(x,0,z,X,0,Z);for(const[q,r]of[[x,z],[X,Z]]){const t=Math.max(0,Math.min(1,(8-Math.hypot(q,r))/5));c.push(.23+.65*t,.17+.53*t,.06+.23*t)}};for(let x=-R;x<=R;x+=2){L(x,-R,x,R);L(-R,x,R,x)}const gm=new THREE.BufferGeometry();gm.setAttribute('position',new THREE.Float32BufferAttribute(a,3));gm.setAttribute('color',new THREE.Float32BufferAttribute(c,3));const o=new THREE.LineSegments(gm,new THREE.LineBasicMaterial({vertexColors:true}));o.position.y=.012;return o}
+// glyphs
+export function build(T,p,ctx){const a=[],R=()=>ctx.rng()*3|0;for(let i=0;i<8;i++)for(let k=0;k<4;k++){const x=R()*.5-.5,z=R()*.45,X=R()*.5-.5,Z=R()*.45,d=X-x,e=Z-z;a.push(new T.BoxGeometry(Math.hypot(d,e)+.1,.02,.09).rotateY(Math.atan2(e,d)).translate((x+X)/2,0,-i*1.2-(z+Z)/2))}return new T.Mesh(ctx.lib.mergeGeometries(a),new T.MeshBasicMaterial({color:'#ffc84a'}))}

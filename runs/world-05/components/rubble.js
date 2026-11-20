@@ -1,2 +1,3 @@
-// x
-export function build(T){return new T.Group()}
+// water
+export function build(T,p,ctx){const t=ctx.dataTexture(128,128,(u,v)=>{const n=ctx.rng()<.05?230:ctx.noise2(u*30,v*3)*255;return[n*.5,n*.55,n*.7]});t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(2,10);const m=new T.Mesh(new T.PlaneGeometry(40,55).rotateX(-1.5708),ctx.pbr('#1a2638',{map:t,roughness:.03,metalness:1,transparent:true,opacity:.9}));m.userData.t=t;return m}
+export function update(o,t){o.userData.t.offset.y=-t*.8}
