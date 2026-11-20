@@ -1,0 +1,2 @@
+// silver open ring with center dot sigil
+export function build(T){const g=new T.Group(),b=new T.MeshBasicMaterial({color:'#dfe9ff',fog:false,side:2});g.add(new T.Mesh(new T.RingGeometry(.03,.04,24),b),new T.Mesh(new T.CircleGeometry(.01,8),b));g.rotation.x=-Math.PI/2;return g}

@@ -1,3 +1,2 @@
-// concentric glow rings; r,n,w(width),c
-export function build(THREE,p,ctx){const g=new THREE.Group(),R=p.r||60,n=p.n||10,tx=ctx.dataTexture(64,4,u=>{const a=Math.pow(Math.max(0,1-Math.abs(u-.5)*2),1.5)*255;return[a,a,a]});g.userData.ms=[];for(let i=0;i<n;i++){const r0=R*(i+1)/n,w=p.w||.6+i*.25,m=new THREE.MeshBasicMaterial({color:p.c||'#5fa0ff',alphaMap:tx,transparent:true,opacity:.25,blending:2,depthWrite:false,side:2}),geo=new THREE.RingGeometry(r0-w,r0,96,1),ps=geo.attributes.position,uv=geo.attributes.uv;for(let k=0;k<ps.count;k++)uv.setXY(k,Math.hypot(ps.getX(k),ps.getY(k))>r0-w/2?1:0,.5);const k=new THREE.Mesh(geo,m);k.rotation.x=-Math.PI/2;k.position.y=.05;g.add(k);g.userData.ms.push(m)}return g}
-export function update(o,t){const ms=o.userData.ms,n=ms.length;ms.forEach((m,i)=>{m.opacity=(.4-i/n*.15)*(.25+.75*(.5+.5*Math.sin(t*1.1+i/n*6.283)))})}
+// stub
+export function build(T){return new T.Group}
