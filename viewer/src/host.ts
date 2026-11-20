@@ -59,8 +59,8 @@ function cutsceneOverlay() {
     <div data-bar style="position:absolute;left:0;right:0;top:0;height:0;background:#000;transition:height .6s"></div>
     <div data-bar style="position:absolute;left:0;right:0;bottom:0;height:0;background:#000;transition:height .6s"></div>
     <div data-fade style="position:absolute;inset:0;background:#000;opacity:0"></div>
-    <div data-title style="position:absolute;left:0;right:0;top:40%;text-align:center;font-size:clamp(22px,4vw,48px);letter-spacing:.12em;text-transform:uppercase;text-shadow:0 2px 18px #000;opacity:0;transition:opacity .5s"></div>
-    <div data-sub style="position:absolute;left:8%;right:8%;bottom:16%;text-align:center;font-size:clamp(14px,2vw,22px);font-style:italic;text-shadow:0 1px 10px #000;opacity:0;transition:opacity .5s"></div>`;
+    <div data-title style="position:absolute;left:50%;transform:translateX(-50%);top:40%;text-align:center;font-size:clamp(22px,4vw,48px);letter-spacing:.12em;text-transform:uppercase;text-shadow:0 2px 12px #000;opacity:0;transition:opacity .5s;padding:10px 28px;border-radius:14px;background:radial-gradient(ellipse at center,rgba(0,0,0,.55),rgba(0,0,0,0) 75%)"></div>
+    <div data-sub style="position:absolute;left:50%;transform:translateX(-50%);max-width:84%;bottom:15%;text-align:center;font-size:clamp(14px,2vw,22px);font-style:italic;text-shadow:0 1px 4px #000;opacity:0;transition:opacity .5s;padding:8px 18px;border-radius:12px;background:rgba(6,7,12,.55);backdrop-filter:blur(6px) brightness(.75);-webkit-backdrop-filter:blur(6px) brightness(.75)"></div>`;
   document.body.append(root);
   const [top, bottom] = root.querySelectorAll<HTMLElement>('[data-bar]');
   const fade = root.querySelector<HTMLElement>('[data-fade]')!;
