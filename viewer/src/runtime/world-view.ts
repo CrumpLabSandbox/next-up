@@ -6,6 +6,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { COMPONENT_LIB } from '../../../shared/component-lib.js';
 import { makeCtx, moduleUrl, countTriangles } from '../../../shared/component-api.js';
@@ -101,6 +102,19 @@ export class WorldView {
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
+    // A single NaN/Inf pixel (from any component's material or geometry) would be
+    // smeared across the whole frame by the bloom blur and turn it black, so
+    // scrub invalid values and clamp extreme highlights before bloom.
+    this.composer.addPass(new ShaderPass({
+      uniforms: { tDiffuse: { value: null } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+        void main() {
+          vec4 c = texture2D(tDiffuse, vUv);
+          if (any(isnan(c)) || any(isinf(c))) c = vec4(0.0, 0.0, 0.0, 1.0);
+          gl_FragColor = clamp(c, 0.0, 32.0);
+        }`,
+    }));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(960, 540), 0, 0.5, 0.9);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
