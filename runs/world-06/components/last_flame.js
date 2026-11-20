@@ -1,0 +1,3 @@
+// caged pale gold flame with amber halo
+export function build(T,p,c){const g=new T.Group(),B=(col,o)=>new T.MeshBasicMaterial({color:col,transparent:true,opacity:o,blending:2,depthWrite:false}),f=new T.Mesh(new T.SphereGeometry(.3,10,8),B('#ffd68a',.9)),h=new T.Mesh(new T.SphereGeometry(.14,8,6),B('#fff',1)),k=new T.Mesh(new T.SphereGeometry(.55,8,6),new T.MeshBasicMaterial({color:'#bcd4ff',wireframe:true})),a=new T.Mesh(new T.SphereGeometry(1.3,10,8),B('#ff9a30',.3));f.scale.y=1.6;g.add(f,h,k,a);g.userData={f,a};return g}
+export function update(o,t){const u=o.userData,s=1+Math.sin(t*9)*.1+Math.sin(t*3.7)*.1;u.f.scale.set(s,1.6*s,s);u.a.scale.setScalar(s)}

@@ -1,3 +1,2 @@
-// faint outline; k 0 arch,1 rain door,2 lantern shore,4 halo
-export function build(T,p){const g=new T.Group(),k=p.k,B=(o,c,a)=>new T.MeshBasicMaterial({color:c,transparent:true,opacity:o,blending:a||1,depthWrite:false,fog:false}),A=(a,m,x,y,z)=>{const o=new T.Mesh(a,m);o.position.set(x,y,z);g.add(o);return o},X=(w,h)=>new T.BoxGeometry(w,h,.1),S=new T.SphereGeometry(.14,5,4),m=B(.85,'#6f86c0');if(k==0){A(new T.TorusGeometry(1.5,.14,6,20,Math.PI),m,0,2.5,0);A(X(.14,2.5),m,-1.5,1.25,0);A(X(.14,2.5),m,1.5,1.25,0);for(let i=0;i<6;i++)A(X(2.6-i*.3,.14),m,0,1.8-i*.3,i*.1)}if(k==1){A(X(2,.14),m,0,3,0);for(let i=0;i<10;i++)A(X(.05,3),B(.8,'#6f86c0'),-.9+i*.2,1.5,0),A(S,B(1,'#ffb050'),-.9+i*.2,.4+i*.25,0)}if(k==2){A(new T.PlaneGeometry(5,1.2),B(.5,'#6f86c0'),0,.6,0);for(let i=0;i<11;i++)A(S,B(1,'#ff9a30'),-2.5+i*.5,1.5+Math.sin(i*2)*.15,0)}if(k==4)A(new T.TorusGeometry(1.5,.05,6,48),B(.35,'#fff4dc',2),0,1.7,0).rotation.x=Math.PI/2;return g}
-export function update(o,t,d,p){if(p.k==4)o.scale.setScalar(1+Math.sin(t*1.3)*.08);else o.children.forEach((c,i)=>c.material.opacity=.75+.15*Math.sin(t*2+i))}
+// stub
+export function build(T){return new T.Group}

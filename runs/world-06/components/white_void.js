@@ -1,3 +1,2 @@
-// two counter-rotating inverted spheres of gold/silver threads with lavender horizon band
-export function build(T,p,c){const t=c.dataTexture(256,128,(u,v)=>{const f=Math.pow(Math.abs(Math.sin(u*40+c.noise2(u*6,v*6)*9)),20)*c.noise2(u*3,v*3)*400,h=Math.max(0,1-Math.abs(v-.48)*25)*240;return v>.5?[f,f*.84,f*.54]:[f*.8+h*.55,f*.9+h*.6,f+h*.8]});t.wrapS=T.RepeatWrapping;const m=new T.MeshBasicMaterial({map:t,side:1,fog:false,transparent:true,opacity:.7,blending:2,depthWrite:false}),g=new T.Group(),S=r=>g.add(new T.Mesh(new T.SphereGeometry(r,24,12),m));S(300);S(220);return g}
-export function update(o,t){o.children[0].rotation.y=t*.01;o.children[1].rotation.y=-t*.015}
+// stub
+export function build(T){return new T.Group}
