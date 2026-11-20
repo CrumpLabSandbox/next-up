@@ -1,0 +1,3 @@
+// One orange spark arcing south (+z) over len m, landing and fading, looping every 9 s. params len
+export function build(T,p,c){const g=new T.Group();const tx=c.dataTexture(32,32,(u,v)=>{const d=Math.max(0,1-Math.hypot(u-.5,v-.5)*2),q=255*d*d;return[q,q*.6,q*.25]});const s=new T.Sprite(new T.SpriteMaterial({map:tx,color:'#ffa050',transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false}));s.scale.set(.5,.5,1);g.add(s);g.userData.s=s;return g}
+export function update(o,t,dt,p){const s=o.userData.s,L=p.len||6,k=(t%9)/3;if(k>1.6){s.material.opacity=0;return}const u=Math.min(k,1);s.position.set(0,3.5*(1-u)+Math.sin(u*Math.PI)*1.5,u*L);s.material.opacity=k<1?.5:.5*Math.max(0,1-(k-1)/.6);s.scale.setScalar(k<1?.4:.5)}
