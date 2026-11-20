@@ -1,0 +1,3 @@
+// Sharp blue beam falling straight down from origin. params h (m), w (m). No light.
+export function build(T,p,c){const g=new T.Group(),h=p.h||14,w=p.w||.14;const t=c.dataTexture(16,64,(u,v)=>{const a=Math.max(0,1-Math.abs(u-.5)*2),k=255*a*a*(.25+.75*v);return[k*.4,k*.75,k]});const m=new T.MeshBasicMaterial({map:t,transparent:true,opacity:.5,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide});for(let i=0;i<2;i++){const q=new T.Mesh(new T.PlaneGeometry(w,h),m);q.position.y=-h/2;q.rotation.y=i*Math.PI/2;g.add(q)}g.userData={m};return g}
+export function update(o,t){o.userData.m.opacity=.5*(.85+.15*Math.sin(t*3.3)*Math.sin(t*1.1))}
