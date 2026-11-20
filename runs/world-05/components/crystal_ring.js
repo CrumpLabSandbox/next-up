@@ -1,0 +1,3 @@
+// Thin clear crystal ring with prism glint
+export function build(T,p,ctx){const g=new T.Group(),r=new T.Mesh(new T.TorusGeometry(.012,.002,5,10),ctx.pbr('#e8f4ff',{metalness:.2,roughness:.02,emissive:'#bfe8ff',emissiveIntensity:.8,transparent:true,opacity:.85}));g.add(r);const t=ctx.dataTexture(32,32,(u,v)=>{const a=Math.max(0,1-Math.hypot(u-.5,v-.5)*2),s=a*a;return[200*s,230*s,255*s]}),h=new T.Sprite(new T.SpriteMaterial({map:t,blending:T.AdditiveBlending,transparent:true,opacity:.6,depthWrite:false}));h.scale.setScalar(.12);g.add(h);g.userData.h=h;return g}
+export function update(o,t){o.userData.h.material.opacity=.45+.25*Math.sin(t*2.5)}

@@ -1,0 +1,2 @@
+// Tangle of slack gold wire coil
+export function build(T,p,ctx){const g=new T.Group(),pts=[];for(let i=0;i<14;i++){const a=i*1.1,r=.5-i*.025+ctx.range(-.08,.08);pts.push(new T.Vector3(Math.cos(a)*r,.03+(i%3)*.03,Math.sin(a)*r))}const c=new T.CatmullRomCurve3(pts);g.add(new T.Mesh(new T.TubeGeometry(c,40,.02,4),ctx.pbr('#ffd27a',{metalness:.95,roughness:.25,emissive:'#ffb84a',emissiveIntensity:.35})));return g}
