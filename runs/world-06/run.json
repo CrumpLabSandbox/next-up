@@ -6,10 +6,11 @@
   "maxTurns": 20,
   "designEvery": 1,
   "status": "running",
-  "turnsCompleted": 0,
-  "calls": 0,
+  "turnsCompleted": 1,
+  "calls": 11,
   "mode": "tiered",
   "tier": 0,
   "human": true,
-  "gameMaster": true
+  "gameMaster": true,
+  "awaiting": null
 }
