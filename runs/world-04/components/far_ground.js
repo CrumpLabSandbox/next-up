@@ -1,0 +1,2 @@
+// Huge matte blue-grey ground plane under tiles, matches dune troughs. params size,color
+export function build(T,p,c){const g=new T.PlaneGeometry(p.size||8000,p.size||8000);g.rotateX(-Math.PI/2);return new T.Mesh(g,c.pbr(p.color||'#46568c',{roughness:1,metalness:0}))}

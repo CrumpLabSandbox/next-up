@@ -1,0 +1,2 @@
+// Soft dark contact shadow disc, stretched south. params s (m)
+export function build(T,p,c){const s=p.s||2,t=c.dataTexture(64,64,(u,v)=>{const d=Math.max(0,1-Math.hypot(u-.5,v-.5)*2),k=255*d*Math.sqrt(d);return[k,k,k]});const m=new T.Mesh(new T.PlaneGeometry(s,s*1.4),new T.MeshBasicMaterial({color:'#1a2448',alphaMap:t,transparent:true,opacity:.4,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));m.rotation.x=-Math.PI/2;return m}

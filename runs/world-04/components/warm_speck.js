@@ -1,0 +1,3 @@
+// Tiny warm amber sprite speck. params s (m), o opacity
+export function build(T,p,c){const g=new T.Group();const ht=c.dataTexture(32,32,(u,v)=>{const d=Math.max(0,1-Math.hypot(u-.5,v-.5)*2),k=255*d*d;return[k,k*.6,k*.25]});const s=new T.Sprite(new T.SpriteMaterial({map:ht,color:'#ffb070',transparent:true,opacity:p.o||.6,blending:T.AdditiveBlending,depthWrite:false,fog:false}));s.scale.set(p.s||.3,p.s||.3,1);g.add(s);g.userData={s,o:p.o||.6};return g}
+export function update(o,t){o.userData.s.material.opacity=o.userData.o*(.7+.3*Math.sin(t*1.7)*Math.sin(t*.6))}
