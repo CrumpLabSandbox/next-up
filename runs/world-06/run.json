@@ -1,0 +1,15 @@
+{
+  "id": "world-06",
+  "created": "2026-11-20T13:35:53.255Z",
+  "premise": "",
+  "model": "sonnet",
+  "maxTurns": 20,
+  "designEvery": 1,
+  "status": "running",
+  "turnsCompleted": 0,
+  "calls": 0,
+  "mode": "tiered",
+  "tier": 0,
+  "human": true,
+  "gameMaster": true
+}
