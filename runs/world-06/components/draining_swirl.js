@@ -1,0 +1,3 @@
+// spiral glass flow; s size
+export function build(THREE,p,ctx){const S=p.s||2400;const t=ctx.dataTexture(256,256,(u,v)=>{const x=u-.5,y=v-.5,r=Math.hypot(x,y)*2,f=Math.pow(Math.max(0,Math.sin(Math.atan2(y,x)*5+Math.log(r+.02)*5)),3)*Math.max(0,1-r)*Math.min(1,r*8)*255;return[f,f,f]});const m=new THREE.Mesh(new THREE.PlaneGeometry(S,S),new THREE.MeshBasicMaterial({color:'#9fb4e0',alphaMap:t,transparent:true,opacity:.55,blending:2,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.y=.12;return m}
+export function update(o,t){o.rotation.z=t*.03}
