@@ -78,7 +78,7 @@ function startViewer() {
     await seek(0, false);
     updateStatus();
     renderTicks();
-    if (info.status === 'running') pollTimer = window.setInterval(poll, 3000);
+    if (info.status === 'running') pollTimer = window.setInterval(poll, 2000);
   }
 
   async function poll() {
@@ -97,9 +97,47 @@ function startViewer() {
 
   function updateStatus() {
     const s = $('#status');
-    s.textContent = run ? `${run.status} · ${run.turnsCompleted}/${run.maxTurns} turns` : '';
+    s.textContent = run ? `${run.status} · ${run.turnsCompleted}/${run.maxTurns} turns${run.awaiting ? ' · waiting for you' : ''}` : '';
     s.classList.toggle('live', run?.status === 'running');
+    updateSay();
   }
+
+  // Human Wanderer mode: show the input box while the run waits for a move.
+  const say = $<HTMLFormElement>('#say');
+  let sayTurn = -1;
+  function updateSay() {
+    const waiting = run?.status === 'running' && run.awaiting ? run.awaiting.turn : -1;
+    if (waiting !== sayTurn) {
+      sayTurn = waiting;
+      say.hidden = waiting < 0;
+      $('#say-turn').textContent = `turn ${waiting}`;
+      $('#say-status').textContent = '';
+      say.querySelector('button')!.disabled = false;
+      if (waiting >= 0) $<HTMLTextAreaElement>('#say-action').focus();
+    }
+  }
+  say.onsubmit = async (e) => {
+    e.preventDefault();
+    const action = $<HTMLTextAreaElement>('#say-action').value.trim();
+    if (!action || !run || sayTurn < 0) return;
+    say.querySelector('button')!.disabled = true;
+    $('#say-status').textContent = 'sending…';
+    const res = await fetch('api/input', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ run: run.id, turn: sayTurn, action, thought: $<HTMLInputElement>('#say-thought').value }),
+    }).catch(() => null);
+    if (res?.ok) {
+      $<HTMLTextAreaElement>('#say-action').value = '';
+      $<HTMLInputElement>('#say-thought').value = '';
+      $('#say-status').textContent = 'sent. The world is answering…';
+    } else {
+      say.querySelector('button')!.disabled = false;
+      $('#say-status').textContent = `couldn't send (${res ? (await res.json().catch(() => ({}))).error ?? res.status : 'offline'})`;
+    }
+  };
+  $<HTMLTextAreaElement>('#say-action').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); say.requestSubmit(); }
+  });
 
   function renderTicks() {
     pos.max = String(events.length);
@@ -246,7 +284,7 @@ function startViewer() {
   };
   stage.onKey = handleKey;
   addEventListener('keydown', (e) => {
-    if ((e.target as HTMLElement).tagName === 'SELECT') return;
+    if (['SELECT', 'INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
     if ([' ', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
     handleKey(e.key);
   });

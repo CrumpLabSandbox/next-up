@@ -50,6 +50,31 @@ function runsPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = decodeURIComponent((req.url ?? '').split('?')[0]);
+        if (url === '/api/input' && req.method === 'POST') {
+          // Human Wanderer mode: the viewer's input box submits the person's move here.
+          let body = '';
+          req.on('data', (d) => (body += d));
+          req.on('end', () => {
+            const fail = (code: number, msg: string) => { res.statusCode = code; res.end(JSON.stringify({ error: msg })); };
+            try {
+              const { run, turn, action, thought } = JSON.parse(body);
+              if (typeof run !== 'string' || !/^[\w-]+$/.test(run)) return fail(400, 'bad run');
+              const runDir = path.join(RUNS, run);
+              const info = JSON.parse(fs.readFileSync(path.join(runDir, 'run.json'), 'utf8'));
+              if (!info.awaiting || info.awaiting.turn !== turn) return fail(409, 'not waiting for that turn');
+              const text = String(action ?? '').trim().slice(0, 500);
+              if (!text) return fail(400, 'empty move');
+              fs.mkdirSync(path.join(runDir, 'input'), { recursive: true });
+              const file = path.join(runDir, 'input', `turn-${String(turn).padStart(3, '0')}.json`);
+              fs.writeFileSync(file, JSON.stringify({ action: text, thought: String(thought ?? '').slice(0, 500), via: 'viewer' }));
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ ok: true }));
+            } catch (err) {
+              fail(500, String((err as Error).message));
+            }
+          });
+          return;
+        }
         if (url === '/runs/index.json') {
           res.setHeader('Content-Type', 'application/json');
           res.setHeader('Cache-Control', 'no-store');

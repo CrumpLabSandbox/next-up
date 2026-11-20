@@ -4,7 +4,9 @@
 // runs/<id>/timeline.jsonl.
 //
 //   npm run world -- --turns 50 [--premise "..."] [--model sonnet] [--id name]
-//                    [--reviewer-every 5] [--reviewer-model fable] [--no-tiers]
+//                    [--reviewer-every 5] [--reviewer-model fable] [--no-tiers] [--human]
+//   --human: you are the Wanderer. Each turn waits for runs/<id>/input/turn-NNN.json, written
+//   by the viewer's input box or `npm run say -- <id> "what you do"`.
 //   npm run world -- --resume <id> [--turns 50]
 //   touch runs/<id>/STOP   (stops cleanly after the current turn)
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -17,7 +19,7 @@ import { Capture } from './capture';
 import { checkWorld } from './check';
 import { applyEvent, applyOp, cloneWorld, emptyWorld, LIMITS, worldFromEvents } from '../shared/world';
 import { LADDER, THREE_TIERS, THREE_UNLOCK_GAP, contentBytes, fmtBytes, fmtTier } from '../shared/ladder';
-import type { BuilderEvent, DesignerEvent, Op, RenderEvent, ReviewerEvent, RunInfo, TimelineEvent, WorldState } from '../shared/types';
+import type { BuilderEvent, DesignerEvent, Op, PlayerEvent, RenderEvent, ReviewerEvent, RunInfo, TimelineEvent, WorldState } from '../shared/types';
 
 const RUNS = fileURLToPath(new URL('../runs/', import.meta.url));
 
@@ -32,6 +34,7 @@ const { values: args } = parseArgs({
     'reviewer-every': { type: 'string', default: '5' },
     'reviewer-model': { type: 'string', default: 'fable' },
     'no-tiers': { type: 'boolean', default: false },
+    human: { type: 'boolean', default: false },
   },
 });
 
@@ -76,6 +79,7 @@ if (args.resume) {
     id, created: now(), premise: args.premise ?? '', model: args.model!, maxTurns: Number(args.turns),
     designEvery: Number(args['design-every']), status: 'running', turnsCompleted: 0, calls: 0,
     ...(args['no-tiers'] ? {} : { mode: 'tiered' as const, tier: 0 }),
+    ...(args.human ? { human: true } : {}),
   };
 }
 mkdirSync(join(dir, 'shots'), { recursive: true });
@@ -118,6 +122,23 @@ function limitsText(turn: number) {
   return `tier ${tier + 1}/${THREE_TIERS.length}. Content ${fmtBytes(contentBytes(state))} of ${fmtBytes(l.bytes)} (${pct(contentBytes(state), l.bytes)}), ` +
     `triangles ${lastTriangles.toLocaleString()} of ${l.triangles.toLocaleString()} (${pct(lastTriangles, l.triangles)}), lights ${lastLights} of ${l.lights}. ` +
     (next ? `Next tier: ${fmtTier(next)}, ${wait <= 0 ? 'can be unlocked NOW if the Designer asks' : `unlockable in ${wait} turns`}.` : 'Top tier reached.');
+}
+
+/** Human Wanderer mode: wait for the person's move for this turn. */
+async function humanMove(turn: number): Promise<PlayerEvent> {
+  const file = join(dir, 'input', `turn-${pad(turn)}.json`);
+  mkdirSync(join(dir, 'input'), { recursive: true });
+  run.awaiting = { turn, since: now() };
+  saveRun();
+  console.log(`  waiting for your move (viewer input box, or: npm run say -- ${run.id} "...")`);
+  while (!existsSync(file)) {
+    if (existsSync(join(dir, 'STOP'))) throw new Error('stopped while waiting for the Wanderer');
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  const input = JSON.parse(readFileSync(file, 'utf8'));
+  run.awaiting = null;
+  saveRun();
+  return { turn, type: 'player', thought: String(input.thought ?? ''), action: String(input.action ?? '').trim() || 'look around', human: true, ts: now() };
 }
 
 function record(ev: TimelineEvent) {
@@ -262,8 +283,8 @@ try {
     turnContext.limits = limitsText(turn);
     console.log(`\n=== ${turn === 0 ? 'Genesis' : `Turn ${turn}`}${tiered ? ` · tier ${tier + 1}` : ''} ===`);
     if (turn > 0) {
-      const p = await runPlayer(run.model, turn, events, lastShot);
-      run.calls++;
+      const p = run.human ? await humanMove(turn) : await runPlayer(run.model, turn, events, lastShot);
+      if (!run.human) run.calls++;
       record(p);
       console.log(`  wanderer: ${p.action}`);
     }

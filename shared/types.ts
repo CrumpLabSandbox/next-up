@@ -113,6 +113,8 @@ export interface PlayerEvent {
   type: 'player';
   thought: string;
   action: string;
+  /** True when a person typed this move (human Wanderer mode). */
+  human?: boolean;
   ts: string;
 }
 
@@ -243,4 +245,8 @@ export interface RunInfo {
   turnsCompleted: number;
   calls: number;
   note?: string;
+  /** Human Wanderer mode: a person types the Wanderer's moves. */
+  human?: boolean;
+  /** Set while the run is waiting for the person's move. */
+  awaiting?: { turn: number; since: string } | null;
 }

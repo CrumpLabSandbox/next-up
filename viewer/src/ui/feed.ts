@@ -41,7 +41,7 @@ function builderBody(ev: BuilderEvent) {
 export function renderEvent(ev: TimelineEvent, runId: string): HTMLElement | null {
   switch (ev.type) {
     case 'player':
-      return el(`<div class="msg player"><div class="who">Wanderer</div><div class="action">${esc(ev.action)}</div><div class="thought">${esc(ev.thought)}</div></div>`);
+      return el(`<div class="msg player"><div class="who">Wanderer${ev.human ? ' (you)' : ''}</div><div class="action">${esc(ev.action)}</div><div class="thought">${esc(ev.thought)}</div></div>`);
     case 'narrator':
       return el(`<div class="msg narrator"><div class="who">Narrator</div><div class="narration">${esc(ev.narration)}</div>${ev.movement ? `<div class="move">↳ ${esc(ev.movement)}</div>` : ''}<div class="chips">${factChips(ev)}</div></div>`);
     case 'builder':

@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "selftest": "tsx orchestrator/selftest.ts",
     "build": "vite build --config viewer/vite.config.ts",
-    "world:ladder": "tsx orchestrator/run-ladder.ts"
+    "world:ladder": "tsx orchestrator/run-ladder.ts",
+    "say": "node scripts/say.mjs"
   },
   "dependencies": {
     "three": "^0.187.0"

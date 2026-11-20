@@ -170,7 +170,7 @@ export async function runNarrator(model: string, turn: number, events: TimelineE
   if (turn === 0) {
     parts.push(
       `## This is the opening\nThe Wanderer has just come into being. Nothing exists yet. Write what they first perceive. Establish at most one or two facts: perhaps the ground beneath them, perhaps a single distant light, perhaps only a change in the dark. Leave room for the world to grow.` +
-        (premise ? `\n\nA seed for this world (let it emerge subtly over many turns, don't announce it): ${premise}` : ''),
+        (premise ? `\n\nThe premise for this world, which the opening must honor from the first line (its deeper meaning can emerge over time): ${premise}` : ''),
     );
   } else {
     parts.push(`## Turn ${turn}: the Wanderer acts\n"${action?.action ?? 'looks around'}"\n\nThe picture shows the current rendered view before your response.`);

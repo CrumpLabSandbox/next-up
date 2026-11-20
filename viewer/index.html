@@ -31,6 +31,12 @@
           <div id="walkhelp" hidden>WASD / arrows move · Shift runs · drag to look · Esc returns to the story</div>
           <div id="caption"></div>
           <div id="tip" hidden></div>
+          <form id="say" hidden>
+            <div class="say-head">Your move · <span id="say-turn"></span></div>
+            <textarea id="say-action" rows="2" maxlength="500" placeholder="What do you do, say or ask?"></textarea>
+            <input id="say-thought" maxlength="500" placeholder="Inner thought (optional)" />
+            <div class="say-row"><span id="say-status"></span><button type="submit">Send</button></div>
+          </form>
           <div id="empty" hidden>No runs yet. Start one with <code>npm run world</code>.</div>
         </section>
         <aside id="feed"></aside>
