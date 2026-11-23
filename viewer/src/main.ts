@@ -107,6 +107,7 @@ function startViewer() {
     feed.clear();
     hud.reset();
     $('#cutopt').hidden = !info.gameMaster;
+    if (matchMedia('(max-width: 640px)').matches) $('#cutopt').lastChild!.textContent = ' cuts';
     await seek(0, false);
     updateStatus();
     renderTicks();
@@ -136,6 +137,15 @@ function startViewer() {
 
   // Human Wanderer mode: show the input box while the run waits for a move.
   const say = $<HTMLFormElement>('#say');
+  // Phone layout pins the input sheet above the footer; keep both sizes in CSS vars.
+  const sizes = () => {
+    document.documentElement.style.setProperty('--footer-h', `${$('footer').offsetHeight}px`);
+    document.documentElement.style.setProperty('--say-h', `${say.offsetHeight}px`);
+    document.body.classList.toggle('saying', !say.hidden);
+  };
+  new ResizeObserver(sizes).observe($('footer'));
+  new ResizeObserver(sizes).observe(say);
+  new MutationObserver(sizes).observe(say, { attributes: true, attributeFilter: ['hidden'] });
   let sayTurn = -1;
   function updateSay() {
     const waiting = run?.status === 'running' && run.awaiting ? run.awaiting.turn : -1;

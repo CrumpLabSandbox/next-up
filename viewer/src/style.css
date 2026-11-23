@@ -151,3 +151,50 @@ body.capture #app { grid-template-rows: 1fr; }
   #feed { border-left: 0; border-top: 1px solid var(--line); }
   #premise { display: none; }
 }
+
+/* ---------- phones ---------- */
+html, body { overflow-x: hidden; }
+#app { height: 100dvh; }
+@media (max-width: 640px) {
+  header { flex-wrap: wrap; gap: 6px 8px; padding: 6px 10px; }
+  header h1 { font-size: 14px; }
+  #run { flex: 1 1 0; min-width: 0; max-width: 60%; font-size: 13px; padding: 3px 6px; }
+  #ladder { gap: 6px; }
+  #budget .track { width: 60px; }
+  #budget-label { display: none; }
+  .badge { font-size: 11px; padding: 1px 6px; }
+  #status { flex-basis: 100%; font-size: 11px; order: 10; }
+
+  main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 52%) minmax(0, 48%); }
+  #feed { padding: 8px 10px 24px; font-size: 13.5px; }
+  .msg .narration { font-size: 14px; }
+
+  /* The feed right below shows the narration, so keep the 3D view clear. */
+  #caption { display: none; }
+  #modes { top: 6px; left: 6px; } #modes button { padding: 2px 7px; font-size: 12px; }
+  #walkhelp { display: none; }
+  #hud { top: 38px; right: 6px; width: 148px; gap: 4px; max-height: calc(100% - 50px); }
+  #hud .hw { padding: 4px 6px; font-size: 11px; }
+  #hud .hslots { grid-template-columns: repeat(5, 1fr); }
+  #toast { top: 40px; max-width: 92%; font-size: 13px; }
+  #skipcut { bottom: 10px; right: 10px; font-size: 13px; }
+  #tip { display: none !important; }
+
+  /* Input box: a sheet pinned above the controls, so the scene stays visible. */
+  #say { position: fixed; top: auto; bottom: calc(var(--footer-h, 90px) + 6px); left: 8px; right: 8px; width: auto; transform: none; padding: 8px 10px; gap: 6px; }
+  #say textarea { min-height: 44px; font-size: 16px; }
+  #say input { padding: 6px 8px; font-size: 15px; }
+  #say .say-head { font-size: 11px; }
+  /* Let the feed scroll clear of the input sheet. */
+  body.saying #feed { padding-bottom: calc(var(--say-h, 160px) + 12px); }
+  #hud .hlist .done { display: none; }
+  #hud { max-height: 62%; }
+
+  footer { flex-wrap: wrap; gap: 6px; padding: 6px 10px calc(env(safe-area-inset-bottom) + 6px); }
+  #scrub { order: -1; flex-basis: 100%; margin: 4px 0 2px; }
+  footer button { padding: 4px 9px; font-size: 13px; }
+  #turnlabel { min-width: 0; margin-left: auto; font-size: 12px; }
+  #cutopt, #speed { font-size: 12px; }
+  #speed { padding: 3px 4px; }
+  #thumb { display: none; }
+}
