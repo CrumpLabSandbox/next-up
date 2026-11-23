@@ -1,3 +1,3 @@
-// expanding thin translucent shells from origin; params max
-export function build(T,p,c){const g=new T.Group(),S=[];for(let i=0;i<3;i++){const m=new T.Mesh(new T.SphereGeometry(1,32,16),new T.MeshBasicMaterial({color:'#dfe8ff',transparent:true,opacity:.08,blending:2,depthWrite:false,side:1}));g.add(m);S.push(m)}g.userData={S,M:p.max||160};return g}
+// expanding thin translucent shells; params max
+export function build(T,p,c){const g=new T.Group(),S=[];for(let i=0;i<3;i++){const m=new T.Mesh(new T.SphereGeometry(1,16,8),new T.MeshBasicMaterial({color:'#dfe8ff',transparent:true,opacity:.08,blending:2,depthWrite:false,side:1}));g.add(m);S.push(m)}g.userData={S,M:p.max||160};return g}
 export function update(o,t){const u=o.userData;u.S.forEach((m,i)=>{const s=(t*.12+i/3)%1;m.scale.setScalar(15+s*u.M);m.material.opacity=.09*Math.sin(s*3.1416)})}

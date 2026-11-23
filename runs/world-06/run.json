@@ -6,15 +6,15 @@
   "maxTurns": 20,
   "designEvery": 1,
   "status": "running",
-  "turnsCompleted": 11,
-  "calls": 80,
+  "turnsCompleted": 12,
+  "calls": 87,
   "mode": "tiered",
-  "tier": 1,
+  "tier": 2,
   "human": true,
   "gameMaster": true,
   "awaiting": {
-    "turn": 12,
-    "since": "2026-11-23T13:26:20.842Z",
+    "turn": 13,
+    "since": "2026-11-23T14:26:16.411Z",
     "role": "wanderer",
     "prompt": "What do you do, say or ask?"
   }
