@@ -1,0 +1,3 @@
+// braided pearl-white threads from local origin down to local (0,-1.2,0); pulses
+export function build(T,p,c){const g=new T.Group(),H=p.h||1.2,L=[];for(let i=0;i<6;i++){const pts=[];for(let j=0;j<=16;j++){const s=j/16,a=s*9+i*1.047,r=.18*Math.sin(s*3.1416)+.02;pts.push(new T.Vector3(Math.cos(a)*r,-s*H,Math.sin(a)*r-s*.0))}const l=new T.Line(new T.BufferGeometry().setFromPoints(pts),new T.LineBasicMaterial({color:'#e8f0ff',transparent:true,opacity:.8,blending:2,depthWrite:false}));g.add(l);L.push(l)}g.userData={L};return g}
+export function update(o,t){o.userData.L.forEach((l,i)=>{l.material.opacity=.45+.4*Math.sin(t*4+i);l.rotation.y=t*.8+i})}
