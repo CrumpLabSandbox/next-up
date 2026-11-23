@@ -1,0 +1,3 @@
+// pale island-shaped glow under water with calm ring; params a,b (m)
+export function build(T,p,c){const A=p.a||240,B=p.b||100,t=c.dataTexture(128,128,(u,v)=>{const d=Math.hypot((u-.5)*2,(v-.5)*2)+(c.noise2(u*8,v*8)-.5)*.35,r=Math.exp(-Math.pow((d-.62)/.07,2)),bd=d<.62?.22:0,ring=Math.exp(-Math.pow((d-.9)/.12,2))*.15,x=Math.min(1,r+bd+ring)*255;return[x*.7,x,x*.8]});const m=new T.Mesh(new T.PlaneGeometry(A,B),new T.MeshBasicMaterial({map:t,transparent:true,opacity:.75,blending:2,depthWrite:false,fog:false}));m.rotation.x=-Math.PI/2;m.position.y=.1;m.userData.m=m;return m}
+export function update(o,t){o.material.opacity=.6+Math.sin(t*.8)*.12}

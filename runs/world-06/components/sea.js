@@ -1,0 +1,3 @@
+// vast rippled indigo mirror sea plane; params size
+export function build(T,p,c){const S=p.size||20000,b=c.dataTexture(128,128,(u,v)=>{const n=c.noise2(u*40,v*12)*.5+c.noise2(u*90+3,v*30)*.3+c.noise2(u*200,v*60)*.2,x=n*255;return[x,x,x]});b.wrapS=b.wrapT=T.RepeatWrapping;b.repeat.set(S/40,S/40);const m=new T.Mesh(new T.PlaneGeometry(S,S),c.pbr('#14183e',{roughness:.05,metalness:.35,envMapIntensity:1.8,bumpMap:b,bumpScale:1.2}));m.rotation.x=-Math.PI/2;m.userData.b=b;return m}
+export function update(o,t){o.userData.b.offset.y=t*.004;o.userData.b.offset.x=Math.sin(t*.1)*.01}

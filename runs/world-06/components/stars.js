@@ -1,0 +1,2 @@
+// faint zenith stars; params n,r
+export function build(T,p,c){const n=p.n||220,R=p.r||1500,pos=new Float32Array(n*3);for(let i=0;i<n;i++){const a=c.range(0,6.283),e=c.range(.85,1.5),r=R;pos.set([Math.cos(a)*Math.cos(e)*r,Math.sin(e)*r,Math.sin(a)*Math.cos(e)*r],i*3)}const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(pos,3));return new T.Points(g,new T.PointsMaterial({color:'#ffeedd',size:2,sizeAttenuation:false,transparent:true,opacity:.7,fog:false,depthWrite:false}))}
