@@ -1,0 +1,3 @@
+// 4 soft pearl foam ellipse rings around an island base; params a,b
+export function build(T,p,c){const A=p.a||100,B=p.b||38,g=new T.Group(),rs=[];for(let i=0;i<4;i++){const rg=new T.RingGeometry(.97,1,64);rg.rotateX(-1.5708);const m=new T.Mesh(rg,new T.MeshBasicMaterial({color:'#e8dcf0',transparent:true,opacity:.2,blending:2,depthWrite:false,side:2}));const k=.95+i*.09;m.scale.set(B*k,1,A*k);m.position.y=.12;g.add(m);rs.push(m)}g.userData={rs};return g}
+export function update(o,t){o.userData.rs.forEach((m,i)=>{m.material.opacity=.2*(.6+.4*Math.sin(t*.6+i*1.5))})}

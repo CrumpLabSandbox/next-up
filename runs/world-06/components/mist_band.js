@@ -1,0 +1,2 @@
+// thin low soft mist band; params w,h
+export function build(T,p,c){const w=p.w||300,h=p.h||4,t=c.dataTexture(128,32,(u,v)=>{const e=Math.pow(Math.max(0,1-Math.abs(v-.5)*2),1.5)*Math.pow(Math.max(0,1-Math.abs(u-.5)*2),.7)*(.6+.4*c.noise2(u*10,v*2)),x=e*255;return[x,x,x]});const m=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({color:'#b07890',alphaMap:t,transparent:true,opacity:.18,depthWrite:false,side:2}));m.position.y=h/2;return m}
