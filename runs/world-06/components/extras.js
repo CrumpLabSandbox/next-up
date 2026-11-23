@@ -1,2 +1,2 @@
-// k0 violet debt bubble, k1 saddled giant finger lying along +x
-export function build(T,p,c){const g=new T.Group(),A=(a,m,x,y,z)=>{const o=new T.Mesh(a,m);o.position.set(x,y,z);g.add(o);return o};if(!p.k)A(new T.SphereGeometry(.075,12,8),c.pbr('#b090ff',{roughness:.1,emissive:'#8a50ff',emissiveIntensity:1.2,transparent:true,opacity:.65}),0,0,0);else{const m=c.pbr('#f2dcd0',{roughness:.5,emissive:'#ff9a30',emissiveIntensity:.12});for(let i=0;i<6;i++)A(new T.CapsuleGeometry(.6-i*.02,1.2,3,8),m,i*1.5,.6+Math.sin(i*.5)*.15,0).rotation.z=1.57;A(new T.SphereGeometry(.58,8,6),m,8.2,.6,0);A(new T.SphereGeometry(.35,8,6),c.pbr('#ffb050',{emissive:'#ff8a20',emissiveIntensity:1.5}),7.6,1.15,0).scale.set(1.2,.35,.9);A(new T.TorusGeometry(.75,.12,6,12,3.1416).rotateY(1.5708),c.pbr('#6a3f22',{roughness:.8}),2.5,.6,0)}return g}
+// stub
+export function build(T){return new T.Group}

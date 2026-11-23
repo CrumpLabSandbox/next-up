@@ -1,3 +1,2 @@
-// silver wind curls and gold sparks trailing along local +z
-export function build(T,p,c){const g=new T.Group(),m=new T.LineBasicMaterial({color:'#bcd4ff',transparent:true,opacity:.35});for(let i=0;i<9;i++){const pts=[],y=c.range(-2,3),x=c.range(-3,3),r=c.range(1,2.5);for(let j=0;j<=20;j++){const a=j*.3;pts.push(new T.Vector3(x+Math.sin(a+i)*r*.4,y+Math.cos(a*1.3+i)*.5,j*1.5))}g.add(new T.Line(new T.BufferGeometry().setFromPoints(pts),m))}const n=40,pos=new Float32Array(n*3),b=new Float32Array(n*3);for(let i=0;i<n;i++)b.set([c.range(-.6,.6),c.range(-1.5,-.5),c.range(0,20)],i*3);pos.set(b);const pg=new T.BufferGeometry();pg.setAttribute('position',new T.BufferAttribute(pos,3));const pt=new T.Points(pg,new T.PointsMaterial({color:'#ffb050',size:.25,transparent:true,opacity:.9,depthWrite:false}));g.add(pt);g.userData={pt,b};return g}
-export function update(o,t){const u=o.userData,a=u.pt.geometry.attributes.position;for(let i=0;i<40;i++)a.setZ(i,(u.b[i*3+2]+t*4)%20);a.needsUpdate=true}
+// stub
+export function build(T){return new T.Group}
